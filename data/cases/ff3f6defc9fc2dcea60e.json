@@ -1,0 +1,38 @@
+{
+  "id": "ff3f6defc9fc2dcea60e",
+  "report": "Se observa hígado de forma y tamaño normal, ecogenicidad conservada. Vesícula biliar de paredes finas, se identifica imagen hiperecogénica de 12 milímetros compatible con cálculo. El bazo presenta dimensiones aumentadas, mide 13 centímetros en su eje mayor. Riñones en posición habitual, sin signos de litiasis.",
+  "transcription": " Se observa hígado de forma y tamaño normal, ecogenicidad conservada. Vesícula biliar de paredes finas, se identifica imagen hiperecogénica de 12 mm compatible con cálculo. El bazo presenta dimensiones aumentadas, mide 13 cm en su eje mayor. Riñones en posición habitual, sin signos de litiasis.",
+  "discrepancies": [
+    {
+      "id": "d1",
+      "severity": "style",
+      "audioTimestamp": 15.26,
+      "audioQuote": "13 cm",
+      "reportQuote": "13 centímetros",
+      "reportRange": [
+        226,
+        240
+      ],
+      "explanation": "Diferencia en la unidad de medida, 'cm' en el audio y 'centímetros' en el informe, sin impacto clínico.",
+      "confidence": "alta",
+      "type": "redaccion",
+      "reportSection": "bazo"
+    }
+  ],
+  "metadata": {
+    "promptVersion": "1.0",
+    "audioDurationSeconds": 28,
+    "audioFileName": "Prueba 1.mp3",
+    "audioSizeBytes": 5376044,
+    "reasoning": "Ecografía abdominal con hallazgos de cálculo biliar y esplenomegalia. La transcripción automática y el informe escrito son muy similares.",
+    "generalObservations": "No se detectan discrepancias clínicamente significativas entre la transcripción automática y el informe escrito.",
+    "counts": {
+      "critical": 0,
+      "warning": 0,
+      "style": 1,
+      "total": 1
+    }
+  },
+  "audioUrl": "/audios/ff3f6defc9fc2dcea60e.mp3",
+  "createdAt": "2026-04-24T21:42:40.111Z"
+}

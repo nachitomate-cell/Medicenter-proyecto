@@ -1,0 +1,53 @@
+{
+  "id": "bd87479071f4e0cbdedd",
+  "report": "Parénquima pulmonar de características normales. No se observan focos de consolidación ni lesiones ocupantes de espacio en ambos campos pulmonares. Pleuras de aspecto normal, sin evidencia de derrame. Mediastino de configuración habitual. Silueta cardiaca de tamaño conservado. No se identifican linfonodos aumentados de tamaño.",
+  "transcription": " Se observa hígado de forma y tamaño normal, ecogenicidad conservada. Vesícula biliar de paredes finas, se identifica imagen hiperecogénica de 12 mm compatible con cálculo. El bazo presenta dimensiones aumentadas, mide 13 cm en su eje mayor. Riñones en posición habitual, sin signos de litiasis.",
+  "discrepancies": [
+    {
+      "id": "d1",
+      "severity": "critical",
+      "audioTimestamp": 0,
+      "audioQuote": "hígado de forma y tamaño normal",
+      "reportQuote": "Parénquima pulmonar de características normales",
+      "reportRange": [
+        0,
+        47
+      ],
+      "explanation": "La transcripción automática describe el hígado, mientras que el informe escrito describe el parénquima pulmonar, indicando una discrepancia en la ubicación anatómica.",
+      "confidence": "alta",
+      "type": "ubicacion",
+      "reportSection": "Inicio del informe"
+    },
+    {
+      "id": "d2",
+      "severity": "critical",
+      "audioTimestamp": 8.26,
+      "audioQuote": "Vesícula biliar de paredes finas, se identifica imagen hiperecogénica de 12 mm compatible con cálculo",
+      "reportQuote": "No se observan focos de consolidación ni lesiones ocupantes de espacio en ambos campos pulmonares",
+      "reportRange": [
+        49,
+        146
+      ],
+      "explanation": "La transcripción automática describe una vesícula biliar con un cálculo, mientras que el informe escrito no menciona hallazgos patológicos en el tórax, lo que sugiere una discrepancia en la conclusión diagnóstica.",
+      "confidence": "alta",
+      "type": "conclusion",
+      "reportSection": "Descripción del parénquima pulmonar"
+    }
+  ],
+  "metadata": {
+    "promptVersion": "1.0",
+    "audioDurationSeconds": 28,
+    "audioFileName": "Prueba 1.mp3",
+    "audioSizeBytes": 5376044,
+    "reasoning": "La transcripción automática describe un estudio ecográfico abdominal, mientras que el informe escrito describe un estudio de tórax. Esto sugiere una discrepancia crítica en la ubicación anatómica y conclusión diagnóstica.",
+    "generalObservations": "La transcripción automática y el informe escrito parecen describir estudios ecográficos diferentes, lo que sugiere un error grave en la transcripción o en la selección del informe.",
+    "counts": {
+      "critical": 2,
+      "warning": 0,
+      "style": 0,
+      "total": 2
+    }
+  },
+  "audioUrl": "/audios/bd87479071f4e0cbdedd.mp3",
+  "createdAt": "2026-04-24T21:04:53.350Z"
+}

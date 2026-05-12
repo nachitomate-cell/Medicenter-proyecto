@@ -114,8 +114,6 @@ export default function UploadPage() {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioDuration, setAudioDuration] = useState<number | null>(null);
   const [reportText, setReportText] = useState("");
-  const [preinformeEnabled, setPreinformeEnabled] = useState(false);
-  const [preinformeText, setPreinformeText] = useState("");
 
   // Estado de UI
   const [isDragging, setIsDragging] = useState(false);
@@ -196,33 +194,24 @@ export default function UploadPage() {
     setProcessingError(null);
     setUploadProgress(0);
 
-    const formData = new FormData();
-    formData.append("audio", audioFile);
-    formData.append("report", reportText);
-    if (preinformeEnabled && preinformeText.trim().length >= 10) {
-      formData.append("preinforme", preinformeText);
-    }
-
-    // Timer para avanzar a "auditing" después de que Whisper debería terminar (~8s).
-    // Se cancela si el servidor responde antes.
-    let phaseTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const onUploadComplete = () => {
-      setProcessingPhase("transcribing");
-      phaseTimer = setTimeout(() => setProcessingPhase("auditing"), 8000);
-    };
-
     try {
       setProcessingPhase("uploading");
+
+      const formData = new FormData();
+      formData.append("audio", audioFile);
+      formData.append("report", reportText);
 
       const response = await uploadWithProgress(
         "/api/audit",
         formData,
-        (pct) => setUploadProgress(pct),
-        onUploadComplete
+        (pct) => setUploadProgress(pct)
       );
 
-      if (phaseTimer) clearTimeout(phaseTimer);
+      setProcessingPhase("transcribing");
+      await new Promise((r) => setTimeout(r, 600));
+
+      setProcessingPhase("auditing");
+      await new Promise((r) => setTimeout(r, 400));
 
       const data = response as { caseId: string };
       if (!data.caseId) {
@@ -230,9 +219,11 @@ export default function UploadPage() {
       }
 
       setProcessingPhase("done");
-      setTimeout(() => router.push(`/audit/${data.caseId}`), 500);
+
+      setTimeout(() => {
+        router.push(`/audit/${data.caseId}`);
+      }, 500);
     } catch (err) {
-      if (phaseTimer) clearTimeout(phaseTimer);
       const message =
         err instanceof Error ? err.message : "Error desconocido al procesar.";
       setProcessingError(message);
@@ -256,37 +247,19 @@ export default function UploadPage() {
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-blue-600">
-              <path d="M2 12h2"/>
-              <path d="M6 8v8"/>
-              <path d="M10 6v12"/>
-              <path d="M14 10l2 2 4-4"/>
-              <path d="M14 18l2 2 4-4"/>
-            </svg>
+            <div className="h-6 w-6 rounded bg-gradient-to-br from-blue-600 to-blue-800" />
             <h1 className="text-base font-semibold text-slate-900">
               Auditor Clínico
             </h1>
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium tracking-wide text-slate-600 uppercase">
+            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
               DEMO
             </span>
           </div>
-          <div className="flex items-center gap-3 text-right">
-            {/* TODO: Reemplazar este placeholder por SVG de Medicenter */}
-            <div className="flex h-8 w-8 items-center justify-center rounded bg-[#0B3B5C]">
-              <span className="text-[10px] font-bold text-white">MC</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-semibold text-slate-900">Medicenter</span>
-              <span className="text-xs text-slate-400">powered by SynapTech</span>
-            </div>
-          </div>
+          <div className="text-xs text-slate-500">Medicenter · SynapTech</div>
         </div>
       </header>
 
       <div className="mx-auto max-w-6xl px-6 py-8">
-        <nav className="mb-3 text-xs text-slate-400">
-          Inicio · Nuevo caso
-        </nav>
         <div className="mb-8">
           <h2 className="text-2xl font-semibold text-slate-900">
             Nuevo caso para auditar
@@ -297,36 +270,7 @@ export default function UploadPage() {
           </p>
         </div>
 
-        {/* Toggle preinforme */}
-        <div className="mb-4 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setPreinformeEnabled((v) => !v)}
-            disabled={isProcessing}
-            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none disabled:opacity-50 ${
-              preinformeEnabled ? "bg-blue-600" : "bg-slate-300"
-            }`}
-            aria-pressed={preinformeEnabled}
-          >
-            <span
-              className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                preinformeEnabled ? "translate-x-5" : "translate-x-0"
-              }`}
-            />
-          </button>
-          <div>
-            <span className="text-sm font-medium text-slate-800">
-              Incluir preinforme del tecnólogo
-            </span>
-            <span className="ml-2 text-xs text-slate-400">
-              {preinformeEnabled
-                ? "Comparación triple (audio + preinforme + informe)"
-                : "Comparación dual (audio + informe)"}
-            </span>
-          </div>
-        </div>
-
-        <div className={`grid grid-cols-1 gap-6 ${preinformeEnabled ? "lg:grid-cols-3" : "lg:grid-cols-2"}`}>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <section className="flex flex-col">
             <div className="mb-2 flex items-center justify-between">
               <label className="text-sm font-semibold text-slate-900">
@@ -369,42 +313,13 @@ export default function UploadPage() {
             />
           </section>
 
-          {preinformeEnabled && (
-            <section className="flex flex-col">
-              <div className="mb-2 flex items-center justify-between">
-                <label
-                  htmlFor="preinforme"
-                  className="text-sm font-semibold text-slate-900"
-                >
-                  2. Preinforme del tecnólogo
-                </label>
-                <span className="text-xs text-slate-500">
-                  {preinformeText.length < 10
-                    ? "Mín. 10 caracteres"
-                    : `${preinformeText.length} caracteres`}
-                </span>
-              </div>
-              <textarea
-                id="preinforme"
-                value={preinformeText}
-                onChange={(e) => setPreinformeText(e.target.value)}
-                disabled={isProcessing}
-                placeholder="Pegue aquí el preinforme del tecnólogo..."
-                className="min-h-[280px] flex-1 resize-none rounded-lg border border-blue-200 bg-blue-50/40 p-4 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-500"
-              />
-              <p className="mt-2 text-xs text-slate-500">
-                Elaborado por el tecnólogo a partir de las imágenes del examen.
-              </p>
-            </section>
-          )}
-
           <section className="flex flex-col">
             <div className="mb-2 flex items-center justify-between">
               <label
                 htmlFor="report"
                 className="text-sm font-semibold text-slate-900"
               >
-                {preinformeEnabled ? "3." : "2."} Informe transcrito
+                2. Informe transcrito
               </label>
               <span className="text-xs text-slate-500">
                 {reportText.length < MIN_REPORT_CHARS
@@ -464,15 +379,12 @@ export default function UploadPage() {
           )}
         </div>
 
-        <div className="mt-12 flex justify-center">
-          <div className="inline-flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="16" x2="12" y2="12"/>
-              <line x1="12" y1="8" x2="12.01" y2="8"/>
-            </svg>
-            <span>Entorno de demostración. No usar datos reales de pacientes.</span>
-          </div>
+        <div className="mt-12 rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <p className="text-xs leading-relaxed text-amber-900">
+            <strong>Aviso:</strong> Este es un entorno de demostración. No subir
+            audios ni informes con datos identificatorios reales de pacientes
+            hasta la validación legal correspondiente por parte de Medicenter.
+          </p>
         </div>
       </div>
     </main>
@@ -724,31 +636,15 @@ function ErrorPanel({
 function uploadWithProgress(
   url: string,
   formData: FormData,
-  onProgress: (pct: number) => void,
-  onUploadComplete?: () => void
+  onProgress: (pct: number) => void
 ): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    let uploadCompleteFired = false;
 
     xhr.upload.addEventListener("progress", (e) => {
       if (e.lengthComputable) {
         const pct = Math.round((e.loaded / e.total) * 100);
         onProgress(pct);
-        // Cuando el archivo llegó al servidor pero aún no hay respuesta
-        if (pct === 100 && !uploadCompleteFired) {
-          uploadCompleteFired = true;
-          onUploadComplete?.();
-        }
-      }
-    });
-
-    // Fallback: si el navegador no dispara progress al 100%, lo forzamos en load
-    xhr.upload.addEventListener("load", () => {
-      if (!uploadCompleteFired) {
-        uploadCompleteFired = true;
-        onProgress(100);
-        onUploadComplete?.();
       }
     });
 

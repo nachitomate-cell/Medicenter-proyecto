@@ -1,0 +1,54 @@
+{
+  "id": "5c096f89540e56e40692",
+  "report": "Hígado de forma y tamaño normal, ecogenicidad conservada.\r\n  Vesícula biliar de paredes finas, con imagen hiperecogénica de 8 mm\r\n  compatible con cálculo. Bazo de tamaño normal, mide 11 centímetros.\r\n  Riñones en posición habitual, sin signos de litiasis.\r\n",
+  "transcription": " Se observa hígado de forma y tamaño normal, ecogenicidad conservada. Vesícula biliar de paredes finas, se identifica imagen hiperecogénica de 12 mm compatible con cálculo. El bazo presenta dimensiones aumentadas, mide 13 cm en su eje mayor. Riñones en posición habitual, sin signos de litiasis.",
+  "discrepancies": [
+    {
+      "id": "d1",
+      "severity": "critical",
+      "audioTimestamp": 8.26,
+      "audioQuote": "imagen hiperecogénica de 12 mm compatible con cálculo",
+      "reportQuote": "imagen hiperecogénica de 8 mm compatible con cálculo",
+      "reportRange": [
+        99,
+        154
+      ],
+      "explanation": "El audio registra 12 mm; el informe registra 8 mm. La diferencia puede modificar la conducta clínica respecto a indicación quirúrgica.",
+      "confidence": "alta",
+      "type": "medida",
+      "reportSection": "Vesícula biliar"
+    },
+    {
+      "id": "d2",
+      "severity": "critical",
+      "audioTimestamp": 15.259999,
+      "audioQuote": "El bazo presenta dimensiones aumentadas, mide 13 cm en su eje mayor",
+      "reportQuote": "Bazo de tamaño normal, mide 11 centímetros",
+      "reportRange": [
+        156,
+        198
+      ],
+      "explanation": "El audio describe el bazo como aumentado de tamaño y mide 13 cm, mientras que el informe lo describe como de tamaño normal y mide 11 cm. Esta discrepancia puede tener implicaciones clínicas significativas.",
+      "confidence": "alta",
+      "type": "descriptor",
+      "reportSection": "Bazo"
+    }
+  ],
+  "metadata": {
+    "promptVersion": "1.0",
+    "audioDurationSeconds": 28,
+    "audioFileName": "AUDIO DE PRUEBA.wav",
+    "audioSizeBytes": 5376044,
+    "reasoning": "Ecografía abdominal con hallazgos de colelitiasis y esplenomegalia en la transcripción automática. Detecto discrepancias en la medida del cálculo y en la descripción del bazo.",
+    "generalObservations": "Las descripciones de hígado y riñones son consistentes entre la transcripción automática y el informe escrito.",
+    "counts": {
+      "critical": 2,
+      "warning": 0,
+      "style": 0,
+      "total": 2
+    },
+    "processingMs": 3089
+  },
+  "audioUrl": "/audios/5c096f89540e56e40692.wav",
+  "createdAt": "2026-05-11T18:59:28.731Z"
+}
