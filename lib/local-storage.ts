@@ -92,12 +92,24 @@ export async function listCases(): Promise<CaseSummary[]> {
       promptVersion: data.metadata.promptVersion,
       processingMs: data.metadata.processingMs,
       modelName: data.metadata.modelName,
+      status: data.status ?? "pending",
+      examType: data.examType ?? "—",
+      patientCode: data.patientCode ?? "—",
+      radiologist: data.radiologist ?? "—",
+      approvedAt: data.approvedAt,
     } satisfies CaseSummary;
   });
 
   return summaries.sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
+}
+
+/**
+ * Aprueba un caso cambiando su estado a "approved".
+ */
+export async function approveCase(id: string): Promise<void> {
+  await updateCase(id, { status: "approved", approvedAt: new Date().toISOString() });
 }
 
 /**

@@ -1,12 +1,13 @@
 "use client";
 
-import { use, useEffect, useState, useRef, useMemo } from "react";
+import { use, useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { AuditCase, Discrepancy, Severity } from "@/lib/types";
 import { computeScore } from "@/lib/scoring";
 import { ConcordanceScore } from "@/components/ConcordanceScore";
 import { CaseMetrics } from "@/components/CaseMetrics";
 import { TextualComparisonView } from "@/components/TextualComparisonView";
+import { FlowStepper } from "@/components/FlowStepper";
 
 // ============================================================
 // CONFIG DE SEVERIDAD
@@ -90,6 +91,10 @@ export default function AuditPage({ params }: { params: Promise<{ id: string }> 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Severity | "all">("all");
   const [viewMode, setViewMode] = useState<ViewMode>("discrepancias");
+
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
+  const [approvalError, setApprovalError] = useState<string | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -196,6 +201,29 @@ export default function AuditPage({ params }: { params: Promise<{ id: string }> 
     setCurrentTime(t);
   };
 
+  const handleApprove = useCallback(async () => {
+    if (!caseData) return;
+    setIsApproving(true);
+    setApprovalError(null);
+    try {
+      const res = await fetch(`/api/cases/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "approved" }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || `Error ${res.status}`);
+      }
+      setCaseData((prev) => prev ? { ...prev, status: "approved", approvedAt: new Date().toISOString() } : prev);
+      setShowApprovalModal(false);
+    } catch (err) {
+      setApprovalError(err instanceof Error ? err.message : "Error desconocido.");
+    } finally {
+      setIsApproving(false);
+    }
+  }, [caseData, id]);
+
   const renderedReport = useMemo(() => {
     const ranges = discrepancies
       .filter((d) => d.reportRange[0] >= 0)
@@ -296,7 +324,6 @@ export default function AuditPage({ params }: { params: Promise<{ id: string }> 
             </span>
           </div>
           <div className="flex items-center gap-3 text-right">
-            {/* TODO: Reemplazar este placeholder por SVG de Medicenter */}
             <div className="flex h-8 w-8 items-center justify-center rounded bg-[#0B3B5C]">
               <span className="text-[10px] font-bold text-white">MC</span>
             </div>
@@ -306,13 +333,100 @@ export default function AuditPage({ params }: { params: Promise<{ id: string }> 
             </div>
           </div>
         </div>
+        <div className="border-t border-slate-100 bg-slate-50 px-6 py-3">
+          <div className="mx-auto max-w-[1400px]">
+            <FlowStepper activeStep={4} allComplete={caseData?.status === "approved"} />
+          </div>
+        </div>
       </header>
+
+      {/* ── MODAL APROBACIÓN ─────────────────────────────────── */}
+      {showApprovalModal && caseData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="mx-4 w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-900">Aprobar informe</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              Al aprobar, el informe quedará marcado como revisado y validado por el radiólogo.
+            </p>
+
+            <div className="mt-4 space-y-2 rounded-lg bg-slate-50 p-4 text-sm">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Tipo de examen</span>
+                <span className="font-medium text-slate-900">{caseData.examType ?? "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Paciente</span>
+                <span className="font-mono font-medium text-slate-900">{caseData.patientCode ?? "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Radiólogo</span>
+                <span className="font-medium text-slate-900">{caseData.radiologist ?? "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Hallazgos críticos</span>
+                <span className={`font-medium ${counts.critical > 0 ? "text-red-600" : "text-[#6FA02C]"}`}>
+                  {counts.critical}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Score de concordancia</span>
+                <span className="font-medium text-slate-900">{scoringResult.score}/100</span>
+              </div>
+            </div>
+
+            {counts.critical > 0 && (
+              <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Este caso tiene hallazgos críticos. Asegúrese de haberlos revisado antes de aprobar.
+              </div>
+            )}
+
+            {approvalError && (
+              <p className="mt-3 text-xs text-red-600">{approvalError}</p>
+            )}
+
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                onClick={() => { setShowApprovalModal(false); setApprovalError(null); }}
+                disabled={isApproving}
+                className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleApprove}
+                disabled={isApproving}
+                className="rounded-md bg-[#8BC53D] px-5 py-2 text-sm font-medium text-white transition hover:bg-[#6FA02C] disabled:opacity-50"
+              >
+                {isApproving ? "Aprobando..." : "Confirmar aprobación"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mx-auto w-full max-w-[1400px] flex-1 px-6 py-6 pb-32">
         <nav className="mb-3 text-xs text-slate-400">
           Inicio · Casos · {id.slice(0, 8).toUpperCase()}
         </nav>
         
+        {/* ── BANNER APROBADO ───────────────────────────────────── */}
+        {caseData.status === "approved" && (
+          <div className="mb-4 flex items-center gap-3 rounded-lg border border-[#8BC53D]/40 bg-[#8BC53D]/10 px-4 py-3">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4a7a1e" strokeWidth="2.5">
+              <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+              <polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+            <p className="text-sm font-medium text-[#4a7a1e]">
+              Informe aprobado
+              {caseData.approvedAt && (
+                <span className="ml-2 font-normal text-[#6FA02C]">
+                  · {new Date(caseData.approvedAt).toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                </span>
+              )}
+            </p>
+          </div>
+        )}
+
         {/* ── INFO DEL CASO ──────────────────────────────────────── */}
         <div className="mb-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
@@ -320,17 +434,32 @@ export default function AuditPage({ params }: { params: Promise<{ id: string }> 
               <h2 className="text-2xl font-semibold text-slate-900">
                 Caso #{id.slice(0, 8).toUpperCase()}
               </h2>
-              <p className="mt-1 text-sm text-slate-500">
+              {(caseData.examType || caseData.patientCode) && (
+                <p className="mt-1 text-sm font-medium text-slate-700">
+                  {caseData.examType ?? "—"}
+                  {caseData.patientCode && (
+                    <span className="ml-2 font-mono text-xs font-normal text-slate-500">
+                      {caseData.patientCode}
+                    </span>
+                  )}
+                </p>
+              )}
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-500">
+                {caseData.technologist && caseData.technologist !== "Sin especificar" && (
+                  <span>Tecnólogo: <span className="font-medium text-slate-700">{caseData.technologist}</span></span>
+                )}
+                {caseData.radiologist && caseData.radiologist !== "Sin especificar" && (
+                  <span>Radiólogo: <span className="font-medium text-slate-700">{caseData.radiologist}</span></span>
+                )}
+              </div>
+              <p className="mt-1 text-xs text-slate-400">
                 {caseData.metadata.audioFileName} · {formatTime(duration)}
               </p>
-              <p className="mt-1 text-xs text-slate-400">
-                Procesado en {formatProcessingMs(caseData.metadata.processingMs)}
-              </p>
               <p className="mt-0.5 text-xs text-slate-400">
-                Modelo: {caseData.metadata.modelName ?? "Desconocido"} · Prompt v{caseData.metadata.promptVersion}
+                Procesado en {formatProcessingMs(caseData.metadata.processingMs)} · Modelo: {caseData.metadata.modelName ?? "Desconocido"} · Prompt v{caseData.metadata.promptVersion}
               </p>
             </div>
-            
+
             {/* Feature 1 — Score de Concordancia */}
             <div className="shrink-0 md:w-[280px]">
               <ConcordanceScore result={scoringResult} />
@@ -350,9 +479,21 @@ export default function AuditPage({ params }: { params: Promise<{ id: string }> 
             >
               Nuevo caso
             </button>
-            <button className="rounded-md bg-[#8BC53D] px-3 py-1.5 text-sm font-medium text-white transition hover:bg-[#6FA02C]">
-              Aprobar informe
-            </button>
+            {caseData.status === "approved" ? (
+              <div className="flex items-center gap-1.5 rounded-md border border-[#8BC53D]/40 bg-[#8BC53D]/10 px-3 py-1.5 text-sm font-medium text-[#4a7a1e]">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+                Aprobado
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowApprovalModal(true)}
+                className="rounded-md bg-[#8BC53D] px-3 py-1.5 text-sm font-medium text-white transition hover:bg-[#6FA02C]"
+              >
+                Aprobar informe
+              </button>
+            )}
           </div>
         </div>
 

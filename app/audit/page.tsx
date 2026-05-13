@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { computeScore } from "@/lib/scoring";
-import type { CaseSummary } from "@/lib/types";
+import type { CaseSummary, CaseStatus } from "@/lib/types";
 
 // ============================================================
 // UTILIDADES
@@ -31,6 +31,31 @@ function formatProcessingMs(ms?: number): string {
   return `${(ms / 1000).toFixed(1)} s`;
 }
 
+function startOfWeek(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - d.getDay());
+  return d;
+}
+
+// ============================================================
+// STATUS BADGE
+// ============================================================
+const STATUS_CONFIG: Record<CaseStatus, { label: string; classes: string }> = {
+  pending: { label: "Pendiente", classes: "bg-slate-100 text-slate-600" },
+  attention: { label: "Requiere atención", classes: "bg-red-100 text-red-700" },
+  approved: { label: "Aprobado", classes: "bg-[#8BC53D]/20 text-[#4a7a1e]" },
+};
+
+function StatusBadge({ status }: { status: CaseStatus }) {
+  const cfg = STATUS_CONFIG[status];
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${cfg.classes}`}>
+      {cfg.label}
+    </span>
+  );
+}
+
 // ============================================================
 // CONFIG DE NIVEL
 // ============================================================
@@ -39,6 +64,29 @@ const NIVEL_STYLES = {
   amarillo: { bg: "bg-amber-500", text: "text-amber-700", label: "Revisar" },
   rojo: { bg: "bg-red-500", text: "text-red-700", label: "Atención" },
 } as const;
+
+// ============================================================
+// KPI CARD
+// ============================================================
+function KpiCard({
+  label,
+  value,
+  sub,
+  accent,
+}: {
+  label: string;
+  value: string | number;
+  sub?: string;
+  accent?: string;
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{label}</p>
+      <p className={`mt-1 text-3xl font-bold ${accent ?? "text-slate-900"}`}>{value}</p>
+      {sub && <p className="mt-0.5 text-xs text-slate-400">{sub}</p>}
+    </div>
+  );
+}
 
 // ============================================================
 // COMPONENTE PRINCIPAL
@@ -59,6 +107,16 @@ export default function CasesPage() {
       .catch((e) => setError(e.message))
       .finally(() => setIsLoading(false));
   }, []);
+
+  const kpis = useMemo(() => {
+    const weekStart = startOfWeek();
+    const thisWeek = cases.filter((c) => new Date(c.createdAt) >= weekStart).length;
+    const approved = cases.filter((c) => c.status === "approved").length;
+    const attention = cases.filter((c) => c.status === "attention").length;
+    const scores = cases.map((c) => computeScore(c.counts).score);
+    const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+    return { thisWeek, approved, attention, avgScore };
+  }, [cases]);
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -125,6 +183,41 @@ export default function CasesPage() {
           </button>
         </div>
 
+        {/* ── KPI DASHBOARD ─────────────────────────────────── */}
+        {!isLoading && !error && cases.length > 0 && (
+          <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <KpiCard
+              label="Esta semana"
+              value={kpis.thisWeek}
+              sub="auditorías iniciadas"
+            />
+            <KpiCard
+              label="Score promedio"
+              value={`${kpis.avgScore}`}
+              sub="sobre 100 puntos"
+              accent={
+                kpis.avgScore >= 80
+                  ? "text-[#6FA02C]"
+                  : kpis.avgScore >= 60
+                  ? "text-amber-600"
+                  : "text-red-600"
+              }
+            />
+            <KpiCard
+              label="Aprobados"
+              value={kpis.approved}
+              sub={`de ${cases.length} casos`}
+              accent="text-[#6FA02C]"
+            />
+            <KpiCard
+              label="Requieren atención"
+              value={kpis.attention}
+              sub="con hallazgos críticos"
+              accent={kpis.attention > 0 ? "text-red-600" : "text-slate-900"}
+            />
+          </div>
+        )}
+
         {isLoading && (
           <div className="flex items-center justify-center py-24">
             <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
@@ -177,19 +270,26 @@ export default function CasesPage() {
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     {/* Izquierda: info del caso */}
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-xs font-medium text-slate-400">
                           #{c.id.slice(0, 8).toUpperCase()}
                         </span>
+                        <StatusBadge status={c.status} />
                         {c.modelName && (
                           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
                             {c.modelName}
                           </span>
                         )}
                       </div>
-                      <p className="mt-1 truncate text-sm font-semibold text-slate-900 group-hover:text-blue-700">
-                        {c.audioFileName}
+                      <p className="mt-1 text-sm font-semibold text-slate-900 group-hover:text-blue-700">
+                        {c.examType !== "—" ? c.examType : c.audioFileName}
                       </p>
+                      {c.patientCode !== "—" && (
+                        <p className="mt-0.5 font-mono text-xs text-slate-500">
+                          {c.patientCode}
+                          {c.radiologist !== "—" && ` · Dr/a. ${c.radiologist}`}
+                        </p>
+                      )}
                       <p className="mt-0.5 text-xs text-slate-400">
                         {formatDate(c.createdAt)} · {formatTime(c.audioDurationSeconds)} · {formatProcessingMs(c.processingMs)}
                       </p>

@@ -11,6 +11,8 @@
 
 export type Severity = "critical" | "warning" | "style";
 
+export type CaseStatus = "pending" | "attention" | "approved";
+
 export type DiscrepancySource =
   | "audio_informe"
   | "preinforme_informe"
@@ -43,6 +45,12 @@ export interface AuditCase {
   metadata: AuditMetadata;
   audioUrl: string;
   createdAt: string;
+  status: CaseStatus;
+  examType: string;
+  patientCode: string;
+  technologist: string;
+  radiologist: string;
+  approvedAt?: string;
 }
 
 export interface AuditMetadata {
@@ -83,6 +91,11 @@ export interface CaseSummary {
   promptVersion: string;
   processingMs?: number;
   modelName?: string;
+  status: CaseStatus;
+  examType: string;
+  patientCode: string;
+  radiologist: string;
+  approvedAt?: string;
 }
 
 // ============================================================

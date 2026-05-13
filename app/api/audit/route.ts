@@ -22,6 +22,10 @@ export async function POST(request: Request) {
       preinformeRaw && preinformeRaw.trim().length >= 10
         ? preinformeRaw.trim()
         : undefined;
+    const examType = (formData.get("examType") as string | null) || "Sin especificar";
+    const patientCode = (formData.get("patientCode") as string | null) || `ECO-${Date.now().toString(36).toUpperCase()}`;
+    const technologist = (formData.get("technologist") as string | null) || "Sin especificar";
+    const radiologist = (formData.get("radiologist") as string | null) || "Sin especificar";
 
     const startedAt = Date.now();
     const usedPreinforme = Boolean(preinforme);
@@ -102,6 +106,11 @@ export async function POST(request: Request) {
       metadata,
       audioUrl: "",
       createdAt: new Date().toISOString(),
+      status: metadata.counts.critical > 0 ? "attention" : "pending",
+      examType,
+      patientCode,
+      technologist,
+      radiologist,
     };
 
     const caseId = await saveCase(caseData);

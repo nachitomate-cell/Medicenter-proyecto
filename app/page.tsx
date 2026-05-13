@@ -2,10 +2,32 @@
 
 import { useState, useRef, useCallback, DragEvent, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
+import { FlowStepper } from "@/components/FlowStepper";
 
 // ============================================================
 // CONSTANTES
 // ============================================================
+const EXAM_TYPES = [
+  "Ecografía abdominal",
+  "Ecografía obstétrica",
+  "Ecografía tiroidea",
+  "Ecografía mamaria",
+  "Ecografía renal",
+  "Ecografía pélvica",
+  "Ecografía testicular",
+  "Ecografía partes blandas",
+  "Ecografía vascular",
+  "Doppler",
+];
+
+function generatePatientCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const nums = "0123456789";
+  const prefix = Array.from({ length: 3 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  const suffix = Array.from({ length: 4 }, () => nums[Math.floor(Math.random() * nums.length)]).join("");
+  return `ECO-${prefix}-${suffix}`;
+}
+
 const ACCEPTED_AUDIO_TYPES = [
   "audio/mpeg",
   "audio/mp3",
@@ -109,6 +131,15 @@ function validateAudioFile(file: File): string | null {
 export default function UploadPage() {
   const router = useRouter();
 
+  // Wizard step: 1 = datos del examen, 2 = cargar archivos
+  const [wizardStep, setWizardStep] = useState<1 | 2>(1);
+
+  // Step 1 — datos del examen
+  const [examType, setExamType] = useState(EXAM_TYPES[0]);
+  const [patientCode] = useState(generatePatientCode);
+  const [technologist, setTechnologist] = useState("");
+  const [radiologist, setRadiologist] = useState("");
+
   // Estado de inputs
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -202,6 +233,10 @@ export default function UploadPage() {
     if (preinformeEnabled && preinformeText.trim().length >= 10) {
       formData.append("preinforme", preinformeText);
     }
+    formData.append("examType", examType);
+    formData.append("patientCode", patientCode);
+    formData.append("technologist", technologist.trim() || "Sin especificar");
+    formData.append("radiologist", radiologist.trim() || "Sin especificar");
 
     // Timer para avanzar a "auditing" después de que Whisper debería terminar (~8s).
     // Se cancela si el servidor responde antes.
@@ -246,6 +281,8 @@ export default function UploadPage() {
     setUploadProgress(0);
   };
 
+  const step1Valid = examType.trim().length > 0;
+
   const isProcessing =
     processingPhase !== "idle" &&
     processingPhase !== "error" &&
@@ -271,7 +308,6 @@ export default function UploadPage() {
             </span>
           </div>
           <div className="flex items-center gap-3 text-right">
-            {/* TODO: Reemplazar este placeholder por SVG de Medicenter */}
             <div className="flex h-8 w-8 items-center justify-center rounded bg-[#0B3B5C]">
               <span className="text-[10px] font-bold text-white">MC</span>
             </div>
@@ -281,21 +317,135 @@ export default function UploadPage() {
             </div>
           </div>
         </div>
+        <div className="border-t border-slate-100 bg-slate-50 px-6 py-3">
+          <div className="mx-auto max-w-6xl">
+            <FlowStepper activeStep={wizardStep === 1 ? 1 : isProcessing || processingPhase === "done" ? 3 : 2} />
+          </div>
+        </div>
       </header>
 
       <div className="mx-auto max-w-6xl px-6 py-8">
         <nav className="mb-3 text-xs text-slate-400">
           Inicio · Nuevo caso
         </nav>
-        <div className="mb-8">
-          <h2 className="text-2xl font-semibold text-slate-900">
-            Nuevo caso para auditar
-          </h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Suba el audio del dictado y pegue el informe transcrito. El sistema
-            comparará ambas versiones y marcará las discrepancias.
-          </p>
-        </div>
+
+        {/* ── STEP 1: DATOS DEL EXAMEN ────────────────────────── */}
+        {wizardStep === 1 && (
+          <div>
+            <div className="mb-8">
+              <h2 className="text-2xl font-semibold text-slate-900">
+                Datos del examen
+              </h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Complete la información clínica antes de subir los archivos.
+              </p>
+            </div>
+
+            <div className="max-w-2xl space-y-6">
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-900">
+                  Tipo de examen
+                </label>
+                <select
+                  value={examType}
+                  onChange={(e) => setExamType(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                >
+                  {EXAM_TYPES.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-900">
+                  Código de paciente
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={patientCode}
+                    readOnly
+                    className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 font-mono text-sm text-slate-600"
+                  />
+                  <span className="text-xs text-slate-400">Autogenerado</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-slate-900">
+                    Tecnólogo(a)
+                  </label>
+                  <input
+                    type="text"
+                    value={technologist}
+                    onChange={(e) => setTechnologist(e.target.value)}
+                    placeholder="Nombre del tecnólogo"
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-slate-900">
+                    Radiólogo(a)
+                  </label>
+                  <input
+                    type="text"
+                    value={radiologist}
+                    onChange={(e) => setRadiologist(e.target.value)}
+                    placeholder="Nombre del radiólogo"
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <button
+                  onClick={() => router.push("/audit")}
+                  className="text-sm text-slate-500 hover:text-slate-900"
+                >
+                  Ver historial
+                </button>
+                <button
+                  onClick={() => setWizardStep(2)}
+                  disabled={!step1Valid}
+                  className="rounded-md bg-blue-600 px-6 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  Continuar →
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── STEP 2: CARGAR ARCHIVOS ─────────────────────────── */}
+        {wizardStep === 2 && (
+          <div>
+            <div className="mb-6 flex items-start justify-between">
+              <div>
+                <h2 className="text-2xl font-semibold text-slate-900">
+                  Cargar archivos
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Suba el audio del dictado y pegue el informe transcrito.
+                </p>
+              </div>
+              <button
+                onClick={() => setWizardStep(1)}
+                disabled={isProcessing}
+                className="text-xs text-slate-500 hover:text-slate-900 disabled:opacity-40"
+              >
+                ← Volver
+              </button>
+            </div>
+
+            {/* Resumen Step 1 */}
+            <div className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-1 rounded-lg border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600">
+              <span><span className="font-medium text-slate-900">{examType}</span></span>
+              <span>Paciente: <span className="font-mono font-medium text-slate-900">{patientCode}</span></span>
+              {technologist && <span>Tecnólogo: <span className="font-medium text-slate-900">{technologist}</span></span>}
+              {radiologist && <span>Radiólogo: <span className="font-medium text-slate-900">{radiologist}</span></span>}
+            </div>
 
         {/* Toggle preinforme */}
         <div className="mb-4 flex items-center gap-3">
@@ -474,6 +624,8 @@ export default function UploadPage() {
             <span>Entorno de demostración. No usar datos reales de pacientes.</span>
           </div>
         </div>
+          </div>
+        )}
       </div>
     </main>
   );
@@ -764,7 +916,15 @@ function uploadWithProgress(
           const err = JSON.parse(xhr.responseText);
           reject(new Error(err.message || `Error ${xhr.status}`));
         } catch {
-          reject(new Error(`Error ${xhr.status} del servidor.`));
+          if (xhr.status === 413) {
+            reject(
+              new Error(
+                "El archivo de audio supera el límite permitido por el servidor. Pruebe con un archivo más pequeño."
+              )
+            );
+          } else {
+            reject(new Error(`Error ${xhr.status} del servidor.`));
+          }
         }
       }
     });
