@@ -40,9 +40,21 @@ const ACCEPTED_AUDIO_TYPES = [
   "audio/ogg",
 ];
 const ACCEPTED_EXTENSIONS = ".mp3,.wav,.m4a,.webm,.ogg";
-const MAX_FILE_SIZE_MB = 25;
+const MAX_FILE_SIZE_MB = 6;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 const MIN_REPORT_CHARS = 50;
+
+const DEMO_DATA = {
+  examType: "Ecografía abdominal",
+  technologist: "M. González",
+  radiologist: "P. Muñoz",
+  preinforme:
+    "Hígado de tamaño y ecogenicidad normal. En vesícula biliar se identifica imagen hiperecogénica de 12 mm, compatible con cálculo, con sombra acústica posterior. Bazo de dimensiones aumentadas, eje mayor 13 cm. Ambos riñones sin signos de litiasis ni uropatía obstructiva.",
+  report:
+    "Hígado de tamaño normal con ecogenicidad conservada. Vesícula de paredes finas con cálculo de 8 milímetros. Bazo de tamaño normal, mide 11 centímetros. Ambos riñones sin signos de litiasis ni dilatación.",
+  audioPath: "/demo-audio.mp3",
+  audioName: "demo-ecografia-abdominal.mp3",
+};
 
 // ============================================================
 // TIPOS
@@ -283,6 +295,25 @@ export default function UploadPage() {
 
   const step1Valid = examType.trim().length > 0;
 
+  const [isLoadingDemo, setIsLoadingDemo] = useState(false);
+
+  const loadDemoData = useCallback(async () => {
+    setIsLoadingDemo(true);
+    try {
+      const res = await fetch(DEMO_DATA.audioPath);
+      const blob = await res.blob();
+      const file = new File([blob], DEMO_DATA.audioName, { type: "audio/mpeg" });
+      handleFileSelect(file);
+      setPreinformeEnabled(true);
+      setPreinformeText(DEMO_DATA.preinforme);
+      setReportText(DEMO_DATA.report);
+    } catch {
+      // ignore demo load errors
+    } finally {
+      setIsLoadingDemo(false);
+    }
+  }, [handleFileSelect]);
+
   const isProcessing =
     processingPhase !== "idle" &&
     processingPhase !== "error" &&
@@ -440,11 +471,27 @@ export default function UploadPage() {
             </div>
 
             {/* Resumen Step 1 */}
-            <div className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-1 rounded-lg border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600">
+            <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-1 rounded-lg border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600">
               <span><span className="font-medium text-slate-900">{examType}</span></span>
               <span>Paciente: <span className="font-mono font-medium text-slate-900">{patientCode}</span></span>
               {technologist && <span>Tecnólogo: <span className="font-medium text-slate-900">{technologist}</span></span>}
               {radiologist && <span>Radiólogo: <span className="font-medium text-slate-900">{radiologist}</span></span>}
+            </div>
+
+            {/* Demo loader */}
+            <div className="mb-6 flex items-center justify-between rounded-lg border border-dashed border-blue-200 bg-blue-50/60 px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-blue-900">¿Primera vez usando el sistema?</p>
+                <p className="text-xs text-blue-600">Cargue un caso de demostración con audio, preinforme e informe listos para probar.</p>
+              </div>
+              <button
+                type="button"
+                onClick={loadDemoData}
+                disabled={isProcessing || isLoadingDemo}
+                className="ml-4 shrink-0 rounded-md border border-blue-300 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 shadow-sm transition hover:bg-blue-50 disabled:opacity-50"
+              >
+                {isLoadingDemo ? "Cargando…" : "Cargar datos de prueba"}
+              </button>
             </div>
 
         {/* Toggle preinforme */}
