@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, DragEvent, ChangeEvent } from "react";
+import { useState, useRef, useCallback, useEffect, DragEvent, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { FlowStepper } from "@/components/FlowStepper";
 
@@ -50,8 +50,6 @@ const DEMO_DATA = {
   radiologist: "P. Muñoz",
   preinforme:
     "Hígado de tamaño y ecogenicidad normal. En vesícula biliar se identifica imagen hiperecogénica de 12 mm, compatible con cálculo, con sombra acústica posterior. Bazo de dimensiones aumentadas, eje mayor 13 cm. Ambos riñones sin signos de litiasis ni uropatía obstructiva.",
-  preinformeRadiologo:
-    "Paciente femenino, 42 años. Antecedente de colelitiasis conocida. Estudio de control. Especial atención a vesícula y bazo.",
   report:
     "Hígado de tamaño normal con ecogenicidad conservada. Vesícula de paredes finas con cálculo de 8 milímetros. Bazo de tamaño normal, mide 11 centímetros. Ambos riñones sin signos de litiasis ni dilatación.",
   audioPath: "/demo-audio.mp3",
@@ -161,8 +159,15 @@ export default function UploadPage() {
   const [reportText, setReportText] = useState("");
   const [preinformeEnabled, setPreinformeEnabled] = useState(false);
   const [preinformeText, setPreinformeText] = useState("");
-  const [preinformeRadiologoEnabled, setPreinformeRadiologoEnabled] = useState(false);
-  const [preinformeRadiologoText, setPreinformeRadiologoText] = useState("");
+
+  // Grabación de audio (paso 2 — dictado del radiólogo)
+  type RecordingState = "idle" | "requesting" | "recording" | "recorded";
+  const [recordingState, setRecordingState] = useState<RecordingState>("idle");
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [recordingError, setRecordingError] = useState<string | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Estado de UI
   const [isDragging, setIsDragging] = useState(false);
@@ -222,14 +227,83 @@ export default function UploadPage() {
     if (file) handleFileSelect(file);
   };
 
-  const clearAudio = () => {
+  const clearAudio = useCallback(() => {
     if (audioUrl) URL.revokeObjectURL(audioUrl);
     setAudioFile(null);
     setAudioUrl(null);
     setAudioDuration(null);
     setAudioError(null);
+    setRecordingState("idle");
+    setRecordingSeconds(0);
+    setRecordingError(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
-  };
+  }, [audioUrl]);
+
+  const stopMediaRecorder = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  }, []);
+
+  const startRecording = useCallback(async () => {
+    setRecordingError(null);
+    setRecordingState("requesting");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+
+      const mimeType = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg"].find(
+        (t) => MediaRecorder.isTypeSupported(t)
+      ) ?? "";
+
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const type = recorder.mimeType || "audio/webm";
+        const blob = new Blob(audioChunksRef.current, { type });
+        const ext = type.includes("ogg") ? "ogg" : "webm";
+        const file = new File([blob], `dictado-${Date.now()}.${ext}`, { type });
+        handleFileSelect(file);
+        setRecordingState("recorded");
+      };
+
+      recorder.start(250);
+      setRecordingState("recording");
+      setRecordingSeconds(0);
+      recordingTimerRef.current = setInterval(
+        () => setRecordingSeconds((s) => s + 1),
+        1000
+      );
+    } catch {
+      setRecordingState("idle");
+      setRecordingError("No se pudo acceder al micrófono. Verifique los permisos del navegador.");
+    }
+  }, [handleFileSelect]);
+
+  const stopRecording = useCallback(() => {
+    stopMediaRecorder();
+  }, [stopMediaRecorder]);
+
+  const resetRecording = useCallback(() => {
+    stopMediaRecorder();
+    clearAudio();
+  }, [stopMediaRecorder, clearAudio]);
+
+  useEffect(() => {
+    return () => {
+      stopMediaRecorder();
+    };
+  }, [stopMediaRecorder]);
 
   const canProcess =
     audioFile !== null &&
@@ -289,9 +363,6 @@ export default function UploadPage() {
           ...(preinformeEnabled && preinformeText.trim().length >= 10
             ? { preinforme: preinformeText }
             : {}),
-          ...(preinformeRadiologoEnabled && preinformeRadiologoText.trim().length >= 10
-            ? { preinformeRadiologo: preinformeRadiologoText }
-            : {}),
           examType,
           patientCode,
           technologist: technologist.trim() || "Sin especificar",
@@ -343,8 +414,6 @@ export default function UploadPage() {
       handleFileSelect(file);
       setPreinformeEnabled(true);
       setPreinformeText(DEMO_DATA.preinforme);
-      setPreinformeRadiologoEnabled(true);
-      setPreinformeRadiologoText(DEMO_DATA.preinformeRadiologo);
       setReportText(DEMO_DATA.report);
     } catch {
       // ignore demo load errors
@@ -544,40 +613,78 @@ export default function UploadPage() {
                 )}
               </div>
 
-              {/* Notas previas del radiólogo */}
+              {/* Dictado del radiólogo — grabación */}
               <div className="rounded-lg border border-slate-200 bg-white p-5">
-                <div className="mb-3 flex items-center gap-3">
+                <div className="mb-4">
+                  <span className="text-sm font-medium text-slate-800">
+                    Dictado del radiólogo
+                  </span>
+                  <p className="text-xs text-slate-400">
+                    Grabe el dictado directamente. El audio se transcribirá y auditará en el siguiente paso.
+                  </p>
+                </div>
+
+                {/* Idle — sin audio */}
+                {!audioFile && recordingState === "idle" && (
                   <button
                     type="button"
-                    onClick={() => setPreinformeRadiologoEnabled((v) => !v)}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none ${
-                      preinformeRadiologoEnabled ? "bg-blue-600" : "bg-slate-300"
-                    }`}
-                    aria-pressed={preinformeRadiologoEnabled}
+                    onClick={startRecording}
+                    className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 hover:border-slate-400"
                   >
-                    <span
-                      className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                        preinformeRadiologoEnabled ? "translate-x-5" : "translate-x-0"
-                      }`}
-                    />
+                    <MicIcon />
+                    Iniciar dictado
                   </button>
+                )}
+
+                {/* Solicitando permiso */}
+                {recordingState === "requesting" && (
+                  <div className="flex items-center gap-3 text-sm text-slate-500">
+                    <Spinner />
+                    Solicitando acceso al micrófono…
+                  </div>
+                )}
+
+                {/* Grabando */}
+                {recordingState === "recording" && (
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-500" />
+                      <span className="font-mono text-sm font-medium text-red-600">
+                        {formatDuration(recordingSeconds)}
+                      </span>
+                      <span className="text-xs text-slate-500">Grabando…</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={stopRecording}
+                      className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-red-700"
+                    >
+                      <StopIcon />
+                      Detener
+                    </button>
+                  </div>
+                )}
+
+                {/* Audio grabado (o cargado) */}
+                {audioFile && recordingState !== "recording" && recordingState !== "requesting" && (
                   <div>
-                    <span className="text-sm font-medium text-slate-800">
-                      Notas previas del radiólogo
-                    </span>
-                    <p className="text-xs text-slate-400">
-                      Observaciones del radiólogo antes del dictado formal
+                    <AudioPreview
+                      file={audioFile}
+                      url={audioUrl}
+                      duration={audioDuration}
+                      onClear={resetRecording}
+                      onDurationLoaded={setAudioDuration}
+                      audioRef={audioPreviewRef}
+                      disabled={false}
+                    />
+                    <p className="mt-2 text-xs text-green-700 font-medium">
+                      Dictado listo · se usará en el paso siguiente
                     </p>
                   </div>
-                </div>
-                {preinformeRadiologoEnabled && (
-                  <textarea
-                    value={preinformeRadiologoText}
-                    onChange={(e) => setPreinformeRadiologoText(e.target.value)}
-                    placeholder="Observaciones previas del radiólogo..."
-                    rows={6}
-                    className="w-full resize-none rounded-lg border border-slate-300 bg-slate-50/40 p-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                  />
+                )}
+
+                {recordingError && (
+                  <p className="mt-2 text-xs text-red-600">{recordingError}</p>
                 )}
               </div>
 
@@ -629,8 +736,8 @@ export default function UploadPage() {
               {preinformeEnabled && preinformeText.trim().length >= 10 && (
                 <span className="rounded-full bg-blue-100 px-2 py-0.5 font-medium text-blue-700">Preinforme tecnólogo</span>
               )}
-              {preinformeRadiologoEnabled && preinformeRadiologoText.trim().length >= 10 && (
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-700">Notas radiólogo</span>
+              {audioFile && recordingState === "recorded" && (
+                <span className="rounded-full bg-green-100 px-2 py-0.5 font-medium text-green-700">Dictado grabado</span>
               )}
             </div>
 
@@ -1092,6 +1199,25 @@ function CheckIcon() {
       strokeWidth="3"
     >
       <path d="M5 13l4 4L19 7" />
+    </svg>
+  );
+}
+
+function MicIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+      <line x1="12" y1="19" x2="12" y2="23" />
+      <line x1="8" y1="23" x2="16" y2="23" />
+    </svg>
+  );
+}
+
+function StopIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+      <rect x="4" y="4" width="16" height="16" rx="2" />
     </svg>
   );
 }
