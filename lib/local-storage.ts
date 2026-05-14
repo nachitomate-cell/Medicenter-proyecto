@@ -13,6 +13,7 @@ import type { AuditCase, CaseSummary } from "./types";
 
 const DATA_DIR = path.join(process.cwd(), "data", "cases");
 const AUDIO_DIR = path.join(process.cwd(), "public", "audios");
+const TEMP_DIR = path.join(process.cwd(), "data", "temp");
 
 function ensureDirs() {
   if (!fs.existsSync(DATA_DIR)) {
@@ -21,6 +22,32 @@ function ensureDirs() {
   if (!fs.existsSync(AUDIO_DIR)) {
     fs.mkdirSync(AUDIO_DIR, { recursive: true });
   }
+  if (!fs.existsSync(TEMP_DIR)) {
+    fs.mkdirSync(TEMP_DIR, { recursive: true });
+  }
+}
+
+export function saveTempAudio(buffer: Buffer, ext: string): string {
+  ensureDirs();
+  const uploadId = crypto.randomBytes(10).toString("hex");
+  const filePath = path.join(TEMP_DIR, `${uploadId}.${ext}`);
+  fs.writeFileSync(filePath, buffer);
+  return uploadId;
+}
+
+export function loadTempAudio(uploadId: string, ext: string): Buffer | null {
+  const safeId = uploadId.replace(/[^a-f0-9]/gi, "");
+  const safeExt = ext.replace(/[^a-z0-9]/gi, "");
+  const filePath = path.join(TEMP_DIR, `${safeId}.${safeExt}`);
+  if (!fs.existsSync(filePath)) return null;
+  return fs.readFileSync(filePath);
+}
+
+export function deleteTempAudio(uploadId: string, ext: string): void {
+  const safeId = uploadId.replace(/[^a-f0-9]/gi, "");
+  const safeExt = ext.replace(/[^a-z0-9]/gi, "");
+  const filePath = path.join(TEMP_DIR, `${safeId}.${safeExt}`);
+  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 }
 
 /**

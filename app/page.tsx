@@ -239,39 +239,53 @@ export default function UploadPage() {
     setProcessingError(null);
     setUploadProgress(0);
 
-    const formData = new FormData();
-    formData.append("audio", audioFile);
-    formData.append("report", reportText);
-    if (preinformeEnabled && preinformeText.trim().length >= 10) {
-      formData.append("preinforme", preinformeText);
-    }
-    formData.append("examType", examType);
-    formData.append("patientCode", patientCode);
-    formData.append("technologist", technologist.trim() || "Sin especificar");
-    formData.append("radiologist", radiologist.trim() || "Sin especificar");
-
-    // Timer para avanzar a "auditing" después de que Whisper debería terminar (~8s).
-    // Se cancela si el servidor responde antes.
     let phaseTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const onUploadComplete = () => {
-      setProcessingPhase("transcribing");
-      phaseTimer = setTimeout(() => setProcessingPhase("auditing"), 8000);
-    };
 
     try {
       setProcessingPhase("uploading");
 
-      const response = await uploadWithProgress(
-        "/api/audit",
-        formData,
-        (pct) => setUploadProgress(pct),
-        onUploadComplete
+      // Paso 1: subir audio como binario raw (evita multipart/form-data que
+      // puede ser interceptado por Next.js como posible server action).
+      const { uploadId, ext } = await uploadBinaryAudio(
+        "/api/upload-audio",
+        audioFile,
+        (pct) => setUploadProgress(pct)
       );
+
+      // Transición de fase: ahora el servidor va a transcribir y auditar.
+      setProcessingPhase("transcribing");
+      phaseTimer = setTimeout(() => setProcessingPhase("auditing"), 8000);
+
+      // Paso 2: disparar la auditoría con JSON (sin multipart, sin problemas de tamaño).
+      const auditRes = await fetch("/api/audit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          uploadId,
+          uploadExt: ext,
+          uploadContentType: audioFile.type || "audio/webm",
+          uploadFileName: audioFile.name,
+          report: reportText,
+          ...(preinformeEnabled && preinformeText.trim().length >= 10
+            ? { preinforme: preinformeText }
+            : {}),
+          examType,
+          patientCode,
+          technologist: technologist.trim() || "Sin especificar",
+          radiologist: radiologist.trim() || "Sin especificar",
+        }),
+      });
 
       if (phaseTimer) clearTimeout(phaseTimer);
 
-      const data = response as { caseId: string };
+      if (!auditRes.ok) {
+        const errData = await auditRes.json().catch(() => ({})) as Record<string, string>;
+        throw new Error(
+          errData.message || `Error ${auditRes.status} del servidor.`
+        );
+      }
+
+      const data = (await auditRes.json()) as { caseId?: string };
       if (!data.caseId) {
         throw new Error("Respuesta del servidor sin identificador de caso.");
       }
@@ -721,7 +735,7 @@ function DropZone({
           Arrastre el audio aquí o haga clic para seleccionar
         </p>
         <p className="mt-1 text-xs text-slate-500">
-          MP3, WAV, M4A, WebM u OGG · Máx. 25 MB
+          MP3, WAV, M4A, WebM u OGG · Máx. {MAX_FILE_SIZE_MB} MB
         </p>
       </button>
       {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
@@ -920,36 +934,21 @@ function ErrorPanel({
 // ============================================================
 // HELPERS
 // ============================================================
-function uploadWithProgress(
+function uploadBinaryAudio(
   url: string,
-  formData: FormData,
-  onProgress: (pct: number) => void,
-  onUploadComplete?: () => void
-): Promise<unknown> {
+  audioFile: File,
+  onProgress: (pct: number) => void
+): Promise<{ uploadId: string; ext: string }> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    let uploadCompleteFired = false;
 
     xhr.upload.addEventListener("progress", (e) => {
       if (e.lengthComputable) {
-        const pct = Math.round((e.loaded / e.total) * 100);
-        onProgress(pct);
-        // Cuando el archivo llegó al servidor pero aún no hay respuesta
-        if (pct === 100 && !uploadCompleteFired) {
-          uploadCompleteFired = true;
-          onUploadComplete?.();
-        }
+        onProgress(Math.round((e.loaded / e.total) * 100));
       }
     });
 
-    // Fallback: si el navegador no dispara progress al 100%, lo forzamos en load
-    xhr.upload.addEventListener("load", () => {
-      if (!uploadCompleteFired) {
-        uploadCompleteFired = true;
-        onProgress(100);
-        onUploadComplete?.();
-      }
-    });
+    xhr.upload.addEventListener("load", () => onProgress(100));
 
     xhr.addEventListener("load", () => {
       if (xhr.status >= 200 && xhr.status < 300) {
@@ -960,18 +959,10 @@ function uploadWithProgress(
         }
       } else {
         try {
-          const err = JSON.parse(xhr.responseText);
+          const err = JSON.parse(xhr.responseText) as Record<string, string>;
           reject(new Error(err.message || `Error ${xhr.status}`));
         } catch {
-          if (xhr.status === 413) {
-            reject(
-              new Error(
-                "El archivo de audio supera el límite permitido por el servidor. Pruebe con un archivo más pequeño."
-              )
-            );
-          } else {
-            reject(new Error(`Error ${xhr.status} del servidor.`));
-          }
+          reject(new Error(`Error ${xhr.status} al subir el audio.`));
         }
       }
     });
@@ -984,7 +975,12 @@ function uploadWithProgress(
     );
 
     xhr.open("POST", url);
-    xhr.send(formData);
+    xhr.setRequestHeader(
+      "Content-Type",
+      audioFile.type || "application/octet-stream"
+    );
+    xhr.setRequestHeader("X-Audio-Filename", audioFile.name);
+    xhr.send(audioFile);
   });
 }
 
