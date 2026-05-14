@@ -1,17 +1,18 @@
 "use client";
 
-const STEPS: { n: 1 | 2 | 3 | 4; label: string }[] = [
+const STEPS: { n: 1 | 2 | 3 | 4 | 5; label: string; optional?: boolean }[] = [
   { n: 1, label: "Datos del examen" },
-  { n: 2, label: "Cargar archivos" },
-  { n: 3, label: "Auditoría IA" },
-  { n: 4, label: "Aprobación" },
+  { n: 2, label: "Pre-dictado", optional: true },
+  { n: 3, label: "Cargar archivos" },
+  { n: 4, label: "Auditoría IA" },
+  { n: 5, label: "Aprobación" },
 ];
 
 export function FlowStepper({
   activeStep,
   allComplete = false,
 }: {
-  activeStep: 1 | 2 | 3 | 4;
+  activeStep: 1 | 2 | 3 | 4 | 5;
   allComplete?: boolean;
 }) {
   return (
@@ -56,6 +57,9 @@ export function FlowStepper({
                 }`}
               >
                 {step.label}
+                {step.optional && (
+                  <span className="ml-1 text-[10px] font-normal opacity-60">(opc.)</span>
+                )}
               </span>
             </div>
             {i < STEPS.length - 1 && (

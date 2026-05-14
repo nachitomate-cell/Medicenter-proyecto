@@ -335,7 +335,7 @@ export default function AuditPage({ params }: { params: Promise<{ id: string }> 
         </div>
         <div className="border-t border-slate-100 bg-slate-50 px-6 py-3">
           <div className="mx-auto max-w-[1400px]">
-            <FlowStepper activeStep={4} allComplete={caseData?.status === "approved"} />
+            <FlowStepper activeStep={5} allComplete={caseData?.status === "approved"} />
           </div>
         </div>
       </header>

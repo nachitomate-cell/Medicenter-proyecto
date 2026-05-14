@@ -50,6 +50,8 @@ const DEMO_DATA = {
   radiologist: "P. Muñoz",
   preinforme:
     "Hígado de tamaño y ecogenicidad normal. En vesícula biliar se identifica imagen hiperecogénica de 12 mm, compatible con cálculo, con sombra acústica posterior. Bazo de dimensiones aumentadas, eje mayor 13 cm. Ambos riñones sin signos de litiasis ni uropatía obstructiva.",
+  preinformeRadiologo:
+    "Paciente femenino, 42 años. Antecedente de colelitiasis conocida. Estudio de control. Especial atención a vesícula y bazo.",
   report:
     "Hígado de tamaño normal con ecogenicidad conservada. Vesícula de paredes finas con cálculo de 8 milímetros. Bazo de tamaño normal, mide 11 centímetros. Ambos riñones sin signos de litiasis ni dilatación.",
   audioPath: "/demo-audio.mp3",
@@ -143,8 +145,8 @@ function validateAudioFile(file: File): string | null {
 export default function UploadPage() {
   const router = useRouter();
 
-  // Wizard step: 1 = datos del examen, 2 = cargar archivos
-  const [wizardStep, setWizardStep] = useState<1 | 2>(1);
+  // Wizard step: 1 = datos del examen, 2 = pre-dictado, 3 = cargar archivos
+  const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
 
   // Step 1 — datos del examen
   const [examType, setExamType] = useState(EXAM_TYPES[0]);
@@ -159,6 +161,8 @@ export default function UploadPage() {
   const [reportText, setReportText] = useState("");
   const [preinformeEnabled, setPreinformeEnabled] = useState(false);
   const [preinformeText, setPreinformeText] = useState("");
+  const [preinformeRadiologoEnabled, setPreinformeRadiologoEnabled] = useState(false);
+  const [preinformeRadiologoText, setPreinformeRadiologoText] = useState("");
 
   // Estado de UI
   const [isDragging, setIsDragging] = useState(false);
@@ -285,6 +289,9 @@ export default function UploadPage() {
           ...(preinformeEnabled && preinformeText.trim().length >= 10
             ? { preinforme: preinformeText }
             : {}),
+          ...(preinformeRadiologoEnabled && preinformeRadiologoText.trim().length >= 10
+            ? { preinformeRadiologo: preinformeRadiologoText }
+            : {}),
           examType,
           patientCode,
           technologist: technologist.trim() || "Sin especificar",
@@ -336,6 +343,8 @@ export default function UploadPage() {
       handleFileSelect(file);
       setPreinformeEnabled(true);
       setPreinformeText(DEMO_DATA.preinforme);
+      setPreinformeRadiologoEnabled(true);
+      setPreinformeRadiologoText(DEMO_DATA.preinformeRadiologo);
       setReportText(DEMO_DATA.report);
     } catch {
       // ignore demo load errors
@@ -380,7 +389,7 @@ export default function UploadPage() {
         </div>
         <div className="border-t border-slate-100 bg-slate-50 px-6 py-3">
           <div className="mx-auto max-w-6xl">
-            <FlowStepper activeStep={wizardStep === 1 ? 1 : isProcessing || processingPhase === "done" ? 3 : 2} />
+            <FlowStepper activeStep={wizardStep === 1 ? 1 : wizardStep === 2 ? 2 : isProcessing || processingPhase === "done" ? 4 : 3} />
           </div>
         </div>
       </header>
@@ -479,8 +488,119 @@ export default function UploadPage() {
           </div>
         )}
 
-        {/* ── STEP 2: CARGAR ARCHIVOS ─────────────────────────── */}
+        {/* ── STEP 2: PRE-DICTADO (OPCIONAL) ─────────────────── */}
         {wizardStep === 2 && (
+          <div>
+            <div className="mb-8 flex items-start justify-between">
+              <div>
+                <h2 className="text-2xl font-semibold text-slate-900">Pre-dictado</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Información previa al dictado formal. Ambas secciones son opcionales.
+                </p>
+              </div>
+              <button
+                onClick={() => setWizardStep(1)}
+                className="text-xs text-slate-500 hover:text-slate-900"
+              >
+                ← Volver
+              </button>
+            </div>
+
+            <div className="max-w-2xl space-y-4">
+              {/* Preinforme del tecnólogo */}
+              <div className="rounded-lg border border-slate-200 bg-white p-5">
+                <div className="mb-3 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setPreinformeEnabled((v) => !v)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none ${
+                      preinformeEnabled ? "bg-blue-600" : "bg-slate-300"
+                    }`}
+                    aria-pressed={preinformeEnabled}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                        preinformeEnabled ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                  <div>
+                    <span className="text-sm font-medium text-slate-800">
+                      Preinforme del tecnólogo
+                    </span>
+                    <p className="text-xs text-slate-400">
+                      Elaborado a partir de las imágenes del examen
+                    </p>
+                  </div>
+                </div>
+                {preinformeEnabled && (
+                  <textarea
+                    value={preinformeText}
+                    onChange={(e) => setPreinformeText(e.target.value)}
+                    placeholder="Pegue aquí el preinforme del tecnólogo..."
+                    rows={6}
+                    className="w-full resize-none rounded-lg border border-blue-200 bg-blue-50/40 p-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  />
+                )}
+              </div>
+
+              {/* Notas previas del radiólogo */}
+              <div className="rounded-lg border border-slate-200 bg-white p-5">
+                <div className="mb-3 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setPreinformeRadiologoEnabled((v) => !v)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none ${
+                      preinformeRadiologoEnabled ? "bg-blue-600" : "bg-slate-300"
+                    }`}
+                    aria-pressed={preinformeRadiologoEnabled}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                        preinformeRadiologoEnabled ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                  <div>
+                    <span className="text-sm font-medium text-slate-800">
+                      Notas previas del radiólogo
+                    </span>
+                    <p className="text-xs text-slate-400">
+                      Observaciones del radiólogo antes del dictado formal
+                    </p>
+                  </div>
+                </div>
+                {preinformeRadiologoEnabled && (
+                  <textarea
+                    value={preinformeRadiologoText}
+                    onChange={(e) => setPreinformeRadiologoText(e.target.value)}
+                    placeholder="Observaciones previas del radiólogo..."
+                    rows={6}
+                    className="w-full resize-none rounded-lg border border-slate-300 bg-slate-50/40 p-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  />
+                )}
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <button
+                  onClick={() => setWizardStep(3)}
+                  className="text-sm text-slate-400 hover:text-slate-700"
+                >
+                  Saltar paso →
+                </button>
+                <button
+                  onClick={() => setWizardStep(3)}
+                  className="rounded-md bg-blue-600 px-6 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700"
+                >
+                  Continuar →
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── STEP 3: CARGAR ARCHIVOS ─────────────────────────── */}
+        {wizardStep === 3 && (
           <div>
             <div className="mb-6 flex items-start justify-between">
               <div>
@@ -492,7 +612,7 @@ export default function UploadPage() {
                 </p>
               </div>
               <button
-                onClick={() => setWizardStep(1)}
+                onClick={() => setWizardStep(2)}
                 disabled={isProcessing}
                 className="text-xs text-slate-500 hover:text-slate-900 disabled:opacity-40"
               >
@@ -500,12 +620,18 @@ export default function UploadPage() {
               </button>
             </div>
 
-            {/* Resumen Step 1 */}
+            {/* Resumen Steps 1 y 2 */}
             <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-1 rounded-lg border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600">
               <span><span className="font-medium text-slate-900">{examType}</span></span>
               <span>Paciente: <span className="font-mono font-medium text-slate-900">{patientCode}</span></span>
               {technologist && <span>Tecnólogo: <span className="font-medium text-slate-900">{technologist}</span></span>}
               {radiologist && <span>Radiólogo: <span className="font-medium text-slate-900">{radiologist}</span></span>}
+              {preinformeEnabled && preinformeText.trim().length >= 10 && (
+                <span className="rounded-full bg-blue-100 px-2 py-0.5 font-medium text-blue-700">Preinforme tecnólogo</span>
+              )}
+              {preinformeRadiologoEnabled && preinformeRadiologoText.trim().length >= 10 && (
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-700">Notas radiólogo</span>
+              )}
             </div>
 
             {/* Demo loader */}
@@ -524,36 +650,7 @@ export default function UploadPage() {
               </button>
             </div>
 
-        {/* Toggle preinforme */}
-        <div className="mb-4 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setPreinformeEnabled((v) => !v)}
-            disabled={isProcessing}
-            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none disabled:opacity-50 ${
-              preinformeEnabled ? "bg-blue-600" : "bg-slate-300"
-            }`}
-            aria-pressed={preinformeEnabled}
-          >
-            <span
-              className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                preinformeEnabled ? "translate-x-5" : "translate-x-0"
-              }`}
-            />
-          </button>
-          <div>
-            <span className="text-sm font-medium text-slate-800">
-              Incluir preinforme del tecnólogo
-            </span>
-            <span className="ml-2 text-xs text-slate-400">
-              {preinformeEnabled
-                ? "Comparación triple (audio + preinforme + informe)"
-                : "Comparación dual (audio + informe)"}
-            </span>
-          </div>
-        </div>
-
-        <div className={`grid grid-cols-1 gap-6 ${preinformeEnabled ? "lg:grid-cols-3" : "lg:grid-cols-2"}`}>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <section className="flex flex-col">
             <div className="mb-2 flex items-center justify-between">
               <label className="text-sm font-semibold text-slate-900">
@@ -596,42 +693,13 @@ export default function UploadPage() {
             />
           </section>
 
-          {preinformeEnabled && (
-            <section className="flex flex-col">
-              <div className="mb-2 flex items-center justify-between">
-                <label
-                  htmlFor="preinforme"
-                  className="text-sm font-semibold text-slate-900"
-                >
-                  2. Preinforme del tecnólogo
-                </label>
-                <span className="text-xs text-slate-500">
-                  {preinformeText.length < 10
-                    ? "Mín. 10 caracteres"
-                    : `${preinformeText.length} caracteres`}
-                </span>
-              </div>
-              <textarea
-                id="preinforme"
-                value={preinformeText}
-                onChange={(e) => setPreinformeText(e.target.value)}
-                disabled={isProcessing}
-                placeholder="Pegue aquí el preinforme del tecnólogo..."
-                className="min-h-[280px] flex-1 resize-none rounded-lg border border-blue-200 bg-blue-50/40 p-4 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-500"
-              />
-              <p className="mt-2 text-xs text-slate-500">
-                Elaborado por el tecnólogo a partir de las imágenes del examen.
-              </p>
-            </section>
-          )}
-
           <section className="flex flex-col">
             <div className="mb-2 flex items-center justify-between">
               <label
                 htmlFor="report"
                 className="text-sm font-semibold text-slate-900"
               >
-                {preinformeEnabled ? "3." : "2."} Informe transcrito
+                2. Informe transcrito
               </label>
               <span className="text-xs text-slate-500">
                 {reportText.length < MIN_REPORT_CHARS

@@ -29,6 +29,11 @@ export async function POST(request: Request) {
       preinformeRaw && preinformeRaw.trim().length >= 10
         ? preinformeRaw.trim()
         : undefined;
+    const preinformeRadiologoRaw = body.preinformeRadiologo as string | undefined;
+    const preinformeRadiologo =
+      preinformeRadiologoRaw && preinformeRadiologoRaw.trim().length >= 10
+        ? preinformeRadiologoRaw.trim()
+        : undefined;
     const examType = (body.examType as string | undefined) || "Sin especificar";
     const patientCode =
       (body.patientCode as string | undefined) ||
@@ -145,6 +150,7 @@ export async function POST(request: Request) {
       report,
       transcription: transcriptionData.text,
       ...(preinforme && { preinforme }),
+      ...(preinformeRadiologo && { preinformeRadiologo }),
       discrepancies,
       metadata,
       audioUrl: "",

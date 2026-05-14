@@ -41,6 +41,7 @@ export interface AuditCase {
   report: string;
   transcription: string;
   preinforme?: string;
+  preinformeRadiologo?: string;
   discrepancies: Discrepancy[];
   metadata: AuditMetadata;
   audioUrl: string;
