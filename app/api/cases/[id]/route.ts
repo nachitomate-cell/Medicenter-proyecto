@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { loadCase, updateCase } from "@/lib/local-storage";
+import { loadCase, updateCase } from "@/lib/firestore";
 import type { AuditCase, CaseStatus } from "@/lib/types";
 
 const VALID_STATUSES: CaseStatus[] = ["pending", "attention", "approved"];

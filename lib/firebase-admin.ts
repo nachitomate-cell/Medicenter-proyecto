@@ -20,6 +20,7 @@ import path from "path";
 let app: App | null = null;
 let db: Firestore | null = null;
 let storage: Storage | null = null;
+let corsConfigured = false;
 
 function loadServiceAccount(): { projectId: string; clientEmail: string; privateKey: string } {
   // Strategy 1: Load from service-account.json file (development)
@@ -88,10 +89,31 @@ export function getDb(): Firestore {
   return db;
 }
 
+async function configureBucketCors(bucket: ReturnType<Storage["bucket"]>): Promise<void> {
+  if (corsConfigured) return;
+  corsConfigured = true;
+  try {
+    await bucket.setCorsConfiguration([
+      {
+        maxAgeSeconds: 3600,
+        method: ["PUT", "GET", "HEAD", "OPTIONS"],
+        origin: ["*"],
+        responseHeader: ["Content-Type", "Access-Control-Allow-Origin"],
+      },
+    ]);
+    console.log("Firebase Storage: CORS configured.");
+  } catch (err) {
+    console.warn("Firebase Storage: CORS configuration failed (non-fatal):", err);
+  }
+}
+
 export function getBucket() {
   if (storage) return storage.bucket();
 
   getApp();
   storage = getAdminStorage();
-  return storage.bucket();
+  const bucket = storage.bucket();
+  // Lazily configure CORS (fire-and-forget; errors are non-fatal)
+  configureBucketCors(bucket).catch(() => {});
+  return bucket;
 }

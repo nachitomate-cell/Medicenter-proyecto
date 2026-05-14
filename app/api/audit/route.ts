@@ -2,36 +2,27 @@ import { NextResponse } from "next/server";
 import { transcribeAudio } from "@/lib/whisper";
 import { runAudit, getAuditorModelName } from "@/lib/auditor";
 import { mapLLMOutputToFrontend, generateAuditMetadata } from "@/lib/mapping";
-import {
-  saveCase,
-  updateCase,
-  saveAudio,
-  loadTempAudio,
-  deleteTempAudio,
-} from "@/lib/local-storage";
+import { saveCase, updateCase } from "@/lib/firestore";
+import { getBucket } from "@/lib/firebase-admin";
 import { getPromptVersion } from "@/lib/prompt";
 import { pseudonymize } from "@/lib/pseudonymizer";
 import type { AuditCase } from "@/lib/types";
-
-function validateUploadId(id: string): boolean {
-  return /^[a-f0-9]{20}$/i.test(id);
-}
 
 function validateExt(ext: string): boolean {
   return ["mp3", "wav", "m4a", "webm", "ogg"].includes(ext);
 }
 
 export async function POST(request: Request) {
-  let uploadId: string | undefined;
-  let uploadExt: string | undefined;
+  let storagePath: string | undefined;
 
   try {
     const body = await request.json();
 
-    uploadId = body.uploadId as string | undefined;
-    uploadExt = body.uploadExt as string | undefined;
+    storagePath = body.storagePath as string | undefined;
+    const uploadExt = (body.uploadExt as string | undefined) ?? "webm";
     const uploadFileName = (body.uploadFileName as string | undefined) ?? "audio";
-    const uploadContentType = (body.uploadContentType as string | undefined) ?? "audio/webm";
+    const uploadContentType =
+      (body.uploadContentType as string | undefined) ?? "audio/webm";
     const report = body.report as string | undefined;
     const preinformeRaw = body.preinforme as string | undefined;
     const preinforme =
@@ -47,13 +38,13 @@ export async function POST(request: Request) {
     const radiologist =
       (body.radiologist as string | undefined) || "Sin especificar";
 
-    if (!uploadId || !validateUploadId(uploadId)) {
+    if (!storagePath || typeof storagePath !== "string" || storagePath.trim() === "") {
       return NextResponse.json(
-        { message: "ID de audio inválido o faltante." },
+        { message: "storagePath de audio inválido o faltante." },
         { status: 400 }
       );
     }
-    if (!uploadExt || !validateExt(uploadExt)) {
+    if (!validateExt(uploadExt)) {
       return NextResponse.json(
         { message: "Extensión de audio inválida." },
         { status: 400 }
@@ -70,20 +61,17 @@ export async function POST(request: Request) {
     const usedPreinforme = Boolean(preinforme);
 
     console.log("=== PIPELINE DE AUDITORÍA INICIADO ===");
-    console.log("- UploadId:", uploadId, "ext:", uploadExt);
+    console.log("- StoragePath:", storagePath, "ext:", uploadExt);
     console.log("- Report length:", report.length);
     console.log(
       "- Preinforme:",
       usedPreinforme ? `${preinforme!.length} chars` : "no incluido"
     );
 
-    const audioBuffer = loadTempAudio(uploadId, uploadExt);
-    if (!audioBuffer) {
-      return NextResponse.json(
-        { message: "Audio temporal no encontrado. Intente subir el archivo de nuevo." },
-        { status: 400 }
-      );
-    }
+    // Step 1: Download audio from Firebase Storage
+    const bucket = getBucket();
+    const tempFile = bucket.file(storagePath);
+    const [audioBuffer] = await tempFile.download();
 
     // Buffer is a valid BlobPart at runtime; cast needed due to ArrayBufferLike vs ArrayBuffer TS strictness
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -103,8 +91,7 @@ export async function POST(request: Request) {
     );
 
     console.log("Paso 3: Seudonimizando textos...");
-    const { text: safeReport, tokenCount: reportTokens } =
-      pseudonymize(report);
+    const { text: safeReport, tokenCount: reportTokens } = pseudonymize(report);
     let safePreinforme: string | undefined;
     let preinformeTokens = 0;
     if (preinforme) {
@@ -153,7 +140,7 @@ export async function POST(request: Request) {
       usedPreinforme
     );
 
-    console.log("Paso 5: Guardando caso...");
+    console.log("Paso 5: Guardando caso en Firestore...");
     const caseData: Omit<AuditCase, "id"> = {
       report,
       transcription: transcriptionData.text,
@@ -171,28 +158,30 @@ export async function POST(request: Request) {
 
     const caseId = await saveCase(caseData);
 
-    const audioUrl = await saveAudio(
-      caseId,
-      audioBuffer,
-      uploadExt,
-      uploadContentType
-    );
+    // Step 6: Copy audio to permanent path in Firebase Storage
+    console.log("Paso 6: Guardando audio permanente en Firebase Storage...");
+    const permanentPath = `audios/${caseId}.${uploadExt}`;
+    const permanentFile = bucket.file(permanentPath);
+    await permanentFile.save(audioBuffer, { contentType: uploadContentType });
+    const [audioUrl] = await permanentFile.getSignedUrl({
+      action: "read",
+      expires: "2099-01-01",
+    });
+
     await updateCase(caseId, { audioUrl });
 
-    deleteTempAudio(uploadId, uploadExt);
+    // Step 7: Delete temp upload (best-effort)
+    try {
+      await bucket.file(storagePath).delete();
+    } catch {
+      // best-effort cleanup
+    }
 
     console.log("=== PIPELINE COMPLETADO: /audit/" + caseId + " ===");
 
     return NextResponse.json({ caseId, success: true });
   } catch (error) {
     console.error("Error en pipeline de auditoría:", error);
-    if (uploadId && uploadExt) {
-      try {
-        deleteTempAudio(uploadId, uploadExt);
-      } catch {
-        // best-effort cleanup
-      }
-    }
     const message =
       error instanceof Error ? error.message : "Error interno del servidor.";
     return NextResponse.json({ message }, { status: 500 });

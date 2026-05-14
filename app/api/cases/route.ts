@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listCases } from "@/lib/local-storage";
+import { listCases } from "@/lib/firestore";
 
 export async function GET() {
   try {

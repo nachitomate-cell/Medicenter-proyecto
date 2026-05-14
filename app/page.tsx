@@ -244,26 +244,42 @@ export default function UploadPage() {
     try {
       setProcessingPhase("uploading");
 
-      // Paso 1: subir audio como binario raw (evita multipart/form-data que
-      // puede ser interceptado por Next.js como posible server action).
-      const { uploadId, ext } = await uploadBinaryAudio(
-        "/api/upload-audio",
-        audioFile,
-        (pct) => setUploadProgress(pct)
+      // Paso 1: obtener URL firmada de Firebase Storage (evita el límite de 4.5 MB de Vercel).
+      const ext =
+        audioFile.name.toLowerCase().split(".").pop() ?? "webm";
+      const contentType = audioFile.type || "audio/webm";
+
+      const urlRes = await fetch(
+        `/api/get-upload-url?ext=${encodeURIComponent(ext)}&type=${encodeURIComponent(contentType)}`
+      );
+      if (!urlRes.ok) {
+        const errData = (await urlRes.json().catch(() => ({}))) as Record<string, string>;
+        throw new Error(errData.message || `Error ${urlRes.status} al obtener URL de subida.`);
+      }
+      const { signedUrl, storagePath } = (await urlRes.json()) as {
+        signedUrl: string;
+        storagePath: string;
+        uploadId: string;
+        ext: string;
+      };
+
+      // Paso 2: subir audio directamente a GCS mediante PUT (sin pasar por Vercel).
+      await uploadToSignedUrl(signedUrl, audioFile, (pct) =>
+        setUploadProgress(pct)
       );
 
-      // Transición de fase: ahora el servidor va a transcribir y auditar.
+      // Transición de fase: el servidor va a transcribir y auditar.
       setProcessingPhase("transcribing");
       phaseTimer = setTimeout(() => setProcessingPhase("auditing"), 8000);
 
-      // Paso 2: disparar la auditoría con JSON (sin multipart, sin problemas de tamaño).
+      // Paso 3: disparar la auditoría con JSON.
       const auditRes = await fetch("/api/audit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          uploadId,
+          storagePath,
           uploadExt: ext,
-          uploadContentType: audioFile.type || "audio/webm",
+          uploadContentType: contentType,
           uploadFileName: audioFile.name,
           report: reportText,
           ...(preinformeEnabled && preinformeText.trim().length >= 10
@@ -934,52 +950,28 @@ function ErrorPanel({
 // ============================================================
 // HELPERS
 // ============================================================
-function uploadBinaryAudio(
-  url: string,
+function uploadToSignedUrl(
+  signedUrl: string,
   audioFile: File,
   onProgress: (pct: number) => void
-): Promise<{ uploadId: string; ext: string }> {
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-
     xhr.upload.addEventListener("progress", (e) => {
-      if (e.lengthComputable) {
-        onProgress(Math.round((e.loaded / e.total) * 100));
-      }
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
     });
-
     xhr.upload.addEventListener("load", () => onProgress(100));
-
     xhr.addEventListener("load", () => {
       if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          resolve(JSON.parse(xhr.responseText));
-        } catch {
-          reject(new Error("Respuesta del servidor con formato inválido."));
-        }
+        resolve();
       } else {
-        try {
-          const err = JSON.parse(xhr.responseText) as Record<string, string>;
-          reject(new Error(err.message || `Error ${xhr.status}`));
-        } catch {
-          reject(new Error(`Error ${xhr.status} al subir el audio.`));
-        }
+        reject(new Error(`Error ${xhr.status} al subir el audio.`));
       }
     });
-
-    xhr.addEventListener("error", () =>
-      reject(new Error("Error de red al subir el archivo."))
-    );
-    xhr.addEventListener("abort", () =>
-      reject(new Error("Subida cancelada."))
-    );
-
-    xhr.open("POST", url);
-    xhr.setRequestHeader(
-      "Content-Type",
-      audioFile.type || "application/octet-stream"
-    );
-    xhr.setRequestHeader("X-Audio-Filename", audioFile.name);
+    xhr.addEventListener("error", () => reject(new Error("Error de red al subir el archivo.")));
+    xhr.addEventListener("abort", () => reject(new Error("Subida cancelada.")));
+    xhr.open("PUT", signedUrl);
+    xhr.setRequestHeader("Content-Type", audioFile.type || "application/octet-stream");
     xhr.send(audioFile);
   });
 }
