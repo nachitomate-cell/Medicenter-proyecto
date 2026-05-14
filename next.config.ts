@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "6mb",
     },
+    outputFileTracingIncludes: {
+      "/api/audit": ["./prompts/**"],
+    },
   },
 };
 
