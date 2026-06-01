@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.0",
+    "@google/genai": "^2.7.0",
     "@types/diff": "^7.0.2",
     "diff": "^9.0.0",
     "firebase-admin": "^13.8.0",

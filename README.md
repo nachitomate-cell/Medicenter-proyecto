@@ -39,7 +39,7 @@ Preinforme (opc.) ─▶ Seudonimización de PHI ───────┤
 - **Tailwind CSS v4** (sin librería de componentes)
 - **Firebase Admin** (Firestore + Storage) para casos y audios
 - **LLM auditor** configurable vía `AUDITOR_PROVIDER`: Groq (Llama 3.3 70B),
-  Anthropic (Claude) u OpenAI (GPT-4o mini)
+  Anthropic (Claude), OpenAI (GPT-4o mini) o Google (Gemini)
 - **STT**: Whisper (`whisper-large-v3`) vía Groq
 - **Zod** para validar la salida estructurada del LLM
 
@@ -57,10 +57,12 @@ Otros scripts: `npm run build`, `npm run start`, `npm run lint`.
 
 | Variable | Requerida | Descripción |
 |----------|-----------|-------------|
-| `AUDITOR_PROVIDER` | No | `groq` (default), `anthropic` u `openai`. Selecciona el LLM auditor. |
+| `AUDITOR_PROVIDER` | No | `groq` (default), `anthropic`, `openai` o `gemini`. Selecciona el LLM auditor. |
 | `GROQ_API_KEY` | Sí* | API key de Groq. Necesaria para la transcripción (Whisper) y, si el provider es `groq`, para la auditoría. |
 | `ANTHROPIC_API_KEY` | Sí* | Solo si `AUDITOR_PROVIDER=anthropic`. |
 | `OPENAI_API_KEY` | Sí* | Solo si `AUDITOR_PROVIDER=openai`. |
+| `GEMINI_API_KEY` | Sí* | Solo si `AUDITOR_PROVIDER=gemini`. Se obtiene en [Google AI Studio](https://aistudio.google.com/apikey). |
+| `GEMINI_MODEL` | No | Modelo de Gemini. Default `gemini-2.5-flash`; usar `gemini-2.5-pro` para mejor calidad. |
 | `FIREBASE_PROJECT_ID` | Sí** | Credenciales de Firebase Admin (producción / Vercel). |
 | `FIREBASE_CLIENT_EMAIL` | Sí** | " |
 | `FIREBASE_PRIVATE_KEY` | Sí** | " (con `\n` escapados). |
