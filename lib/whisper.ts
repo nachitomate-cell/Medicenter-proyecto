@@ -11,7 +11,7 @@
  */
 
 import Groq from "groq-sdk";
-import { getGeminiClient, GEMINI_MODEL } from "./gemini";
+import { getGeminiClient, GEMINI_TRANSCRIPTION_MODEL } from "./gemini";
 import type { WhisperVerboseResponse } from "./types";
 
 const TRANSCRIPTION_PROVIDER = process.env.TRANSCRIPTION_PROVIDER ?? "groq";
@@ -19,7 +19,7 @@ const TRANSCRIPTION_PROVIDER = process.env.TRANSCRIPTION_PROVIDER ?? "groq";
 /** Nombre legible del transcriptor activo. Se guarda en la metadata del caso. */
 export function getTranscriptionModelName(): string {
   return TRANSCRIPTION_PROVIDER === "gemini"
-    ? `Gemini (${GEMINI_MODEL})`
+    ? `Gemini (${GEMINI_TRANSCRIPTION_MODEL})`
     : "Whisper large-v3 (Groq)";
 }
 
@@ -119,11 +119,11 @@ async function transcribeWithGemini(
   const mimeType = audioFile.type || "audio/mpeg";
 
   console.log(
-    `DEBUG - Iniciando transcripción con Gemini (${GEMINI_MODEL}, ${mimeType})...`
+    `DEBUG - Iniciando transcripción con Gemini (${GEMINI_TRANSCRIPTION_MODEL}, ${mimeType})...`
   );
 
   const response = await ai.models.generateContent({
-    model: GEMINI_MODEL,
+    model: GEMINI_TRANSCRIPTION_MODEL,
     contents: [
       { text: TRANSCRIPTION_PROMPT },
       { inlineData: { mimeType, data: base64 } },

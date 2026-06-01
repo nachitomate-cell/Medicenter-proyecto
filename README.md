@@ -63,7 +63,8 @@ Otros scripts: `npm run build`, `npm run start`, `npm run lint`.
 | `ANTHROPIC_API_KEY` | Sí* | Solo si `AUDITOR_PROVIDER=anthropic`. |
 | `OPENAI_API_KEY` | Sí* | Solo si `AUDITOR_PROVIDER=openai`. |
 | `GEMINI_API_KEY` | Sí* | Solo si `AUDITOR_PROVIDER=gemini`. Se obtiene en [Google AI Studio](https://aistudio.google.com/apikey). |
-| `GEMINI_MODEL` | No | Modelo de Gemini. Default `gemini-2.5-flash`; usar `gemini-2.5-pro` para mejor calidad. |
+| `GEMINI_MODEL` | No | Modelo de Gemini para la auditoría. Default `gemini-2.5-flash`. |
+| `GEMINI_TRANSCRIPTION_MODEL` | No | Modelo de Gemini para transcribir audio. Default = `GEMINI_MODEL`. Los modelos flash transcriben mal el audio clínico; recomendado `gemini-3.1-pro-preview`. |
 | `FIREBASE_PROJECT_ID` | Sí** | Credenciales de Firebase Admin (producción / Vercel). |
 | `FIREBASE_CLIENT_EMAIL` | Sí** | " |
 | `FIREBASE_PRIVATE_KEY` | Sí** | " (con `\n` escapados). |
