@@ -8,16 +8,12 @@
 import Groq from "groq-sdk";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
-import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { loadAuditorPrompt, loadAuditorPromptWithPreinforme } from "./prompt";
+import { getGeminiClient, GEMINI_MODEL } from "./gemini";
 import type { LLMOutput } from "./types";
 
 const PROVIDER = process.env.AUDITOR_PROVIDER ?? "groq";
-
-// Modelo de Gemini configurable. flash = barato/rápido para pruebas;
-// pro = mejor calidad clínica. Ver https://ai.google.dev/gemini-api/docs/models
-const GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
 
 const MODEL_NAMES: Record<string, string> = {
   groq: "Llama 3.3 70B (Groq)",
@@ -60,17 +56,6 @@ function getOpenAIClient(): OpenAI {
   if (!apiKey) throw new Error("OPENAI_API_KEY environment variable is not set.");
   openaiClient = new OpenAI({ apiKey });
   return openaiClient;
-}
-
-let geminiClient: GoogleGenAI | null = null;
-function getGeminiClient(): GoogleGenAI {
-  if (geminiClient) return geminiClient;
-  const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY (o GOOGLE_API_KEY) environment variable is not set.");
-  }
-  geminiClient = new GoogleGenAI({ apiKey });
-  return geminiClient;
 }
 
 // ============================================================

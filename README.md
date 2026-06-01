@@ -58,7 +58,8 @@ Otros scripts: `npm run build`, `npm run start`, `npm run lint`.
 | Variable | Requerida | Descripción |
 |----------|-----------|-------------|
 | `AUDITOR_PROVIDER` | No | `groq` (default), `anthropic`, `openai` o `gemini`. Selecciona el LLM auditor. |
-| `GROQ_API_KEY` | Sí* | API key de Groq. Necesaria para la transcripción (Whisper) y, si el provider es `groq`, para la auditoría. |
+| `TRANSCRIPTION_PROVIDER` | No | `groq` (default, Whisper con timestamps) o `gemini` (transcribe sin timestamps, opera con una sola key). |
+| `GROQ_API_KEY` | Sí* | API key de Groq. Necesaria si `TRANSCRIPTION_PROVIDER=groq` y/o `AUDITOR_PROVIDER=groq`. No hace falta si transcribís y auditás todo con Gemini. |
 | `ANTHROPIC_API_KEY` | Sí* | Solo si `AUDITOR_PROVIDER=anthropic`. |
 | `OPENAI_API_KEY` | Sí* | Solo si `AUDITOR_PROVIDER=openai`. |
 | `GEMINI_API_KEY` | Sí* | Solo si `AUDITOR_PROVIDER=gemini`. Se obtiene en [Google AI Studio](https://aistudio.google.com/apikey). |
