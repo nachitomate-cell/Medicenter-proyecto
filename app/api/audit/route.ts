@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { transcribeAudio } from "@/lib/whisper";
+import { transcribeAudio, getTranscriptionModelName } from "@/lib/whisper";
 import { runAudit, getAuditorModelName } from "@/lib/auditor";
 import { mapLLMOutputToFrontend, generateAuditMetadata } from "@/lib/mapping";
 import { saveCase, updateCase } from "@/lib/firestore";
@@ -42,6 +42,14 @@ export async function POST(request: Request) {
       (body.technologist as string | undefined) || "Sin especificar";
     const radiologist =
       (body.radiologist as string | undefined) || "Sin especificar";
+    // Duración medida en el navegador; fallback cuando el transcriptor no la
+    // devuelve (p. ej. Gemini, que no entrega duración ni segmentos).
+    const clientDuration =
+      typeof body.audioDurationSeconds === "number" &&
+      isFinite(body.audioDurationSeconds) &&
+      body.audioDurationSeconds > 0
+        ? Math.round(body.audioDurationSeconds)
+        : undefined;
 
     if (!storagePath || typeof storagePath !== "string" || storagePath.trim() === "") {
       return NextResponse.json(
@@ -95,6 +103,13 @@ export async function POST(request: Request) {
       "chars"
     );
 
+    // Duración efectiva: la del transcriptor si la entrega (Whisper), si no la
+    // medida en el navegador. Evita mostrar 0:00 cuando se transcribe con Gemini.
+    const effectiveDuration =
+      transcriptionData.duration && transcriptionData.duration > 0
+        ? transcriptionData.duration
+        : clientDuration ?? 0;
+
     console.log("Paso 3: Seudonimizando textos (informe, transcripción y preinforme)...");
     // Seudonimizamos TODO lo que se envía al LLM y lo que se persiste/muestra:
     // informe, transcripción del audio (puede contener nombre/RUT dictados en
@@ -147,20 +162,21 @@ export async function POST(request: Request) {
       auditResult,
       safeReport,
       transcriptionData.segments,
-      transcriptionData.duration
+      effectiveDuration
     );
 
     const metadata = generateAuditMetadata(
       auditResult,
       discrepancies,
       getPromptVersion(usedPreinforme),
-      transcriptionData.duration,
+      effectiveDuration,
       uploadFileName,
       audioBuffer.length,
       Date.now() - startedAt,
       getAuditorModelName(),
       pseudonymizedTokens,
-      usedPreinforme
+      usedPreinforme,
+      getTranscriptionModelName()
     );
 
     console.log("Paso 5: Guardando caso en Firestore...");

@@ -70,9 +70,9 @@ export function CaseMetrics({
         sub="palabras"
       />
       <MetricCard
-        label="Concordancia textual"
+        label="Cobertura por audio"
         value={`${matchPct}%`}
-        sub="informe cubierto por audio"
+        sub="del informe presente en el dictado"
       />
       <MetricCard
         label="Tiempo de proceso"

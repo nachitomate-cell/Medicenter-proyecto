@@ -146,7 +146,8 @@ export function generateAuditMetadata(
   processingMs?: number,
   modelName?: string,
   pseudonymizedTokens?: number,
-  usedPreinforme?: boolean
+  usedPreinforme?: boolean,
+  transcriptionModel?: string
 ): AuditMetadata {
   const counts = {
     critical: discrepancies.filter((d) => d.severity === "critical").length,
@@ -165,6 +166,7 @@ export function generateAuditMetadata(
     counts,
     ...(processingMs !== undefined && { processingMs }),
     ...(modelName !== undefined && { modelName }),
+    ...(transcriptionModel !== undefined && { transcriptionModel }),
     ...(pseudonymizedTokens !== undefined && { pseudonymizedTokens }),
     ...(usedPreinforme !== undefined && { usedPreinforme }),
   };

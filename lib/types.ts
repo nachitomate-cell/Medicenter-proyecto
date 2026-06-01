@@ -69,6 +69,8 @@ export interface AuditMetadata {
   };
   processingMs?: number;
   modelName?: string;
+  /** Modelo/proveedor usado para transcribir el audio (Whisper, Gemini, …). */
+  transcriptionModel?: string;
   pseudonymizedTokens?: number;
   /** True si el caso incluye preinforme del tecnólogo (comparación triple). */
   usedPreinforme?: boolean;

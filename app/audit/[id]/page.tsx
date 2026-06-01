@@ -516,6 +516,11 @@ export default function AuditPage({ params }: { params: Promise<{ id: string }> 
               transcription={transcriptionText}
               report={reportText}
               preinforme={preinformeText || undefined}
+              transcriptionLabel={
+                caseData.metadata.transcriptionModel
+                  ? `Audio · ${caseData.metadata.transcriptionModel}`
+                  : undefined
+              }
             />
           </div>
         ) : (
@@ -529,7 +534,11 @@ export default function AuditPage({ params }: { params: Promise<{ id: string }> 
                     Informe transcrito
                   </h2>
                   <p className="text-xs text-slate-500">
-                    Transcriptora: M. González · Revisar marcas del auditor
+                    {caseData.technologist &&
+                    caseData.technologist !== "Sin especificar"
+                      ? `Tecnólogo: ${caseData.technologist} · `
+                      : ""}
+                    Revisar marcas del auditor
                   </p>
                 </div>
                 <div className="flex items-center gap-2 text-xs">
@@ -765,9 +774,12 @@ export default function AuditPage({ params }: { params: Promise<{ id: string }> 
             </span>
           </div>
 
-          <div className="hidden items-center gap-2 text-xs text-slate-500 md:flex">
-            <span>Dr. P. Muñoz · Radiología</span>
-          </div>
+          {caseData.radiologist &&
+            caseData.radiologist !== "Sin especificar" && (
+              <div className="hidden items-center gap-2 text-xs text-slate-500 md:flex">
+                <span>{caseData.radiologist} · Radiología</span>
+              </div>
+            )}
         </div>
         <audio ref={audioRef} src={caseData.audioUrl || ""} preload="metadata" />
       </div>

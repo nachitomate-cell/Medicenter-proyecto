@@ -395,6 +395,9 @@ export default function UploadPage() {
           patientCode,
           technologist: technologist.trim() || "Sin especificar",
           radiologist: radiologist.trim() || "Sin especificar",
+          ...(audioDuration && audioDuration > 0
+            ? { audioDurationSeconds: audioDuration }
+            : {}),
         }),
       });
 

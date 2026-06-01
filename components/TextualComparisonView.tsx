@@ -55,6 +55,8 @@ interface TextualComparisonViewProps {
   transcription: string;
   report: string;
   preinforme?: string;
+  /** Etiqueta de la columna de audio (modelo/proveedor de transcripción). */
+  transcriptionLabel?: string;
 }
 
 // ── Columna de diff ───────────────────────────────────────────────────────────
@@ -97,6 +99,7 @@ export function TextualComparisonView({
   transcription,
   report,
   preinforme,
+  transcriptionLabel = "Audio (transcripción)",
 }: TextualComparisonViewProps) {
   const audioVsReport = useMemo(
     () => classifyChanges(diffWordsWithSpace(transcription, report)),
@@ -142,6 +145,13 @@ export function TextualComparisonView({
           </span>{" "}
           = palabra distinta. Sin color = coincide exactamente.
         </p>
+        <p className="mt-2 leading-relaxed text-slate-500">
+          Vista diagnóstica. Parte de las diferencias son ruido de la
+          transcripción automática (homófonos, términos técnicos), no errores de
+          la transcriptora. Las discrepancias <strong>clínicamente relevantes</strong>,
+          ya filtradas por el auditor, están en la pestaña{" "}
+          <strong>Discrepancias</strong>.
+        </p>
       </div>
 
       {/* Panel: Audio vs Informe */}
@@ -150,7 +160,7 @@ export function TextualComparisonView({
       </p>
       <div className="flex min-h-[400px] gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 shadow-sm">
         <DiffColumn
-          title="Audio (Whisper)"
+          title={transcriptionLabel}
           subtitle="rojo = omitido en el informe"
           tokens={audioLeft}
           side="left"

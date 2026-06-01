@@ -16,6 +16,13 @@ import type { WhisperVerboseResponse } from "./types";
 
 const TRANSCRIPTION_PROVIDER = process.env.TRANSCRIPTION_PROVIDER ?? "groq";
 
+/** Nombre legible del transcriptor activo. Se guarda en la metadata del caso. */
+export function getTranscriptionModelName(): string {
+  return TRANSCRIPTION_PROVIDER === "gemini"
+    ? `Gemini (${GEMINI_MODEL})`
+    : "Whisper large-v3 (Groq)";
+}
+
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 // Gemini recibe el audio inline (base64). El base64 infla ~33%, y el límite
 // de request inline ronda los 20 MB; acotamos para fallar con un mensaje claro.
