@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Calculadora de pricing · Auditor Clínico · SynapTech ↔ Medicenter</title>
+<style>
+  :root{
+    --bg:#f1f5f9; --card:#ffffff; --ink:#0f172a; --muted:#64748b;
+    --line:#e2e8f0; --blue:#2563eb; --blue-d:#0B3B5C; --green:#16a34a;
+    --green-bg:#dcfce7; --red:#dc2626; --amber:#b45309; --amber-bg:#fef3c7;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.5;padding:0 0 60px}
+  header{background:var(--card);border-bottom:1px solid var(--line);padding:18px 24px}
+  header .wrap{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:10px}
+  .logo{width:34px;height:34px;border-radius:6px;background:var(--blue-d);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px}
+  h1{font-size:17px;margin:0}
+  .sub{font-size:12px;color:var(--muted)}
+  .tag{background:#f1f5f9;color:var(--muted);font-size:10px;font-weight:600;
+    letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:999px}
+  main{max-width:1100px;margin:0 auto;padding:24px}
+  .grid{display:grid;grid-template-columns:340px 1fr;gap:20px}
+  @media(max-width:880px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px}
+  .card h2{font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 16px}
+  label{display:block;font-size:13px;font-weight:600;margin:14px 0 5px}
+  label:first-of-type{margin-top:0}
+  .hint{font-size:11px;color:var(--muted);font-weight:400}
+  input[type=number],select{width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;
+    font-size:14px;background:#fff;color:var(--ink)}
+  input[type=range]{width:100%}
+  .row{display:flex;gap:10px}
+  .row>div{flex:1}
+  .seg{display:flex;border:1px solid #cbd5e1;border-radius:8px;overflow:hidden}
+  .seg button{flex:1;border:0;background:#fff;padding:9px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer}
+  .seg button.on{background:var(--blue);color:#fff}
+  .toggle{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13px;font-weight:600}
+  .kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:18px}
+  .kpi{border:1px solid var(--line);border-radius:10px;padding:14px}
+  .kpi .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .kpi .v{font-size:22px;font-weight:700;margin-top:3px}
+  .kpi.big{grid-column:span 2;background:linear-gradient(180deg,#f8fafc,#fff)}
+  .kpi.big .v{font-size:30px}
+  .pos{color:var(--green)} .neg{color:var(--red)}
+  .bar{height:10px;border-radius:999px;background:#e2e8f0;overflow:hidden;margin-top:10px}
+  .bar>span{display:block;height:100%;background:var(--green)}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+  th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--line)}
+  th:first-child,td:first-child{text-align:left;font-weight:600}
+  thead th{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid var(--line)}
+  td.cell{font-variant-numeric:tabular-nums}
+  .note{font-size:11px;color:var(--muted);margin-top:14px}
+  .pill{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px}
+  .pill.g{background:var(--green-bg);color:var(--green)}
+  .pill.a{background:var(--amber-bg);color:var(--amber)}
+  .breakdown{font-size:12.5px}
+  .breakdown div{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line)}
+  .breakdown div:last-child{border-bottom:0;font-weight:700}
+  .legend{font-size:11px;color:var(--muted);margin-top:8px}
+  .heat-hi{background:#dcfce7} .heat-md{background:#fef9c3} .heat-lo{background:#fee2e2}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div class="brand">
+    <div class="logo">MC</div>
+    <div>
+      <h1>Calculadora de pricing — Auditor Clínico</h1>
+      <div class="sub">SynapTech ↔ Medicenter · escenarios de margen</div>
+    </div>
+  </div>
+  <span class="tag">Interno · borrador</span>
+</div></header>
+
+<main>
+<div class="grid">
+
+  <!-- ENTRADAS -->
+  <section class="card">
+    <h2>Supuestos</h2>
+
+    <label>Volumen <span class="hint">(informes / mes)</span></label>
+    <input type="number" id="vol" value="6500" min="0" step="100" />
+    <input type="range" id="volR" value="6500" min="0" max="15000" step="100" />
+
+    <label>Modelo de IA <span class="hint">(costo por informe, USD)</span></label>
+    <select id="model">
+      <option value="0.041">Claude Sonnet 4.x — $0,041</option>
+      <option value="0.018">Claude Haiku 4.5 — $0,018</option>
+      <option value="0.176">Claude Opus 4.x — $0,176</option>
+      <option value="0.026">Gemini 2.5 Pro — $0,026</option>
+      <option value="0.011">Gemini 2.5 Flash — $0,011</option>
+    </select>
+    <div class="toggle">
+      <input type="checkbox" id="cache" />
+      <label for="cache" style="margin:0">Caché de prompt activado <span class="hint">(−25% costo IA)</span></label>
+    </div>
+
+    <label>Modelo de cobro</label>
+    <div class="seg">
+      <button id="mPer" class="on" onclick="setMode('per')">Por informe</button>
+      <button id="mFix" onclick="setMode('fix')">Suscripción fija</button>
+    </div>
+
+    <div id="perBox">
+      <label>Precio de venta <span class="hint">(CLP / informe)</span></label>
+      <input type="number" id="price" value="150" min="0" step="10" />
+      <input type="range" id="priceR" value="150" min="0" max="600" step="10" />
+    </div>
+
+    <div id="fixBox" style="display:none">
+      <label>Suscripción mensual <span class="hint">(CLP / mes)</span></label>
+      <input type="number" id="fixed" value="900000" min="0" step="50000" />
+    </div>
+
+    <label>Infra fija <span class="hint">(Vercel + Firebase, USD/mes)</span></label>
+    <input type="number" id="infra" value="60" min="0" step="10" />
+
+    <label>Tipo de cambio <span class="hint">(CLP por USD)</span></label>
+    <input type="number" id="fx" value="950" min="1" step="10" />
+  </section>
+
+  <!-- RESULTADOS -->
+  <section>
+    <div class="card" style="margin-bottom:20px">
+      <h2>Resultado mensual</h2>
+      <div class="kpis">
+        <div class="kpi big">
+          <div class="l">Margen bruto</div>
+          <div class="v" id="kMargin">—</div>
+          <div class="bar"><span id="kBar" style="width:0%"></span></div>
+        </div>
+        <div class="kpi"><div class="l">Ingreso</div><div class="v" id="kRev">—</div></div>
+        <div class="kpi"><div class="l">Costo total</div><div class="v" id="kCost">—</div></div>
+        <div class="kpi"><div class="l">Margen %</div><div class="v" id="kPct">—</div></div>
+        <div class="kpi"><div class="l">Costo IA / informe</div><div class="v" id="kPer">—</div></div>
+      </div>
+      <div class="breakdown">
+        <div><span>Costo IA (auditoría + transcripción)</span><span id="bIA">—</span></div>
+        <div><span>Infra (Vercel + Firebase)</span><span id="bInfra">—</span></div>
+        <div><span>Costo total mensual</span><span id="bTot">—</span></div>
+      </div>
+      <div class="note">El costo IA y de infra se cobran en USD; se convierten a CLP con el tipo de cambio. Precios de IA aproximados (lista, principios 2026) — verificar antes de comprometer.</div>
+    </div>
+
+    <div class="card">
+      <h2>Matriz de escenarios <span class="hint" style="text-transform:none;letter-spacing:0">— margen mensual (CLP) por informe, modelo seleccionado</span></h2>
+      <table id="matrix"></table>
+      <div class="legend">
+        <span class="pill g">≥70% margen</span>
+        <span class="pill a">40–70%</span>
+        <span class="pill" style="background:#fee2e2;color:#dc2626">&lt;40%</span>
+        &nbsp; Filas = volumen/mes · Columnas = precio CLP por informe.
+      </div>
+    </div>
+  </section>
+</div>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+let mode='per';
+const fmtCLP=n=>"$"+Math.round(n).toLocaleString("es-CL");
+const fmtPct=n=>(n*100).toFixed(0)+"%";
+
+function sync(a,b){ $(a).addEventListener('input',()=>{$(b).value=$(a).value;calc();});
+                   $(b).addEventListener('input',()=>{$(a).value=$(b).value;calc();}); }
+sync('vol','volR'); sync('price','priceR');
+['model','cache','fixed','infra','fx'].forEach(id=>$(id).addEventListener('input',calc));
+
+function setMode(m){ mode=m;
+  $('mPer').classList.toggle('on',m==='per');
+  $('mFix').classList.toggle('on',m==='fix');
+  $('perBox').style.display=m==='per'?'block':'none';
+  $('fixBox').style.display=m==='fix'?'block':'none';
+  calc();
+}
+
+function aiCostPerReportUSD(){
+  let c=parseFloat($('model').value);
+  if($('cache').checked) c*=0.75;     // caché ~ -25%
+  return c;
+}
+
+function calc(){
+  const vol=+$('vol').value, fx=+$('fx').value;
+  const infraUSD=+$('infra').value;
+  const aiUSD=aiCostPerReportUSD();
+
+  const iaCLP=aiUSD*vol*fx;
+  const infraCLP=infraUSD*fx;
+  const costCLP=iaCLP+infraCLP;
+
+  const revCLP = mode==='per' ? (+$('price').value)*vol : (+$('fixed').value);
+  const margin = revCLP-costCLP;
+  const pct = revCLP>0 ? margin/revCLP : 0;
+
+  $('kRev').textContent=fmtCLP(revCLP);
+  $('kCost').textContent=fmtCLP(costCLP);
+  $('kMargin').textContent=fmtCLP(margin);
+  $('kMargin').className='v '+(margin>=0?'pos':'neg');
+  $('kPct').textContent=revCLP>0?fmtPct(pct):'—';
+  $('kPer').textContent="$"+(aiUSD*fx).toFixed(0)+" CLP";
+  $('kBar').style.width=Math.max(0,Math.min(100,pct*100))+"%";
+  $('kBar').style.background = pct>=0.7?'#16a34a':pct>=0.4?'#d97706':'#dc2626';
+
+  $('bIA').textContent=fmtCLP(iaCLP)+"  (US$"+(aiUSD*vol).toFixed(0)+")";
+  $('bInfra').textContent=fmtCLP(infraCLP)+"  (US$"+infraUSD.toFixed(0)+")";
+  $('bTot').textContent=fmtCLP(costCLP);
+
+  buildMatrix(fx,aiUSD,infraUSD);
+}
+
+function buildMatrix(fx,aiUSD,infraUSD){
+  const vols=[3000,4500,6000,7500,9000];
+  const prices=[100,150,200,300];
+  let html="<thead><tr><th>Volumen ↓ / Precio →</th>";
+  prices.forEach(p=>html+="<th>$"+p.toLocaleString("es-CL")+"</th>");
+  html+="</tr></thead><tbody>";
+  vols.forEach(v=>{
+    html+="<tr><td>"+v.toLocaleString("es-CL")+"/mes</td>";
+    prices.forEach(p=>{
+      const rev=p*v, cost=aiUSD*v*fx+infraUSD*fx, m=rev-cost, pct=rev>0?m/rev:0;
+      const cls=pct>=0.7?'heat-hi':pct>=0.4?'heat-md':'heat-lo';
+      html+="<td class='cell "+cls+"'>"+fmtCLP(m)+"<br><span style='font-size:10px;color:#64748b'>"+fmtPct(pct)+"</span></td>";
+    });
+    html+="</tr>";
+  });
+  html+="</tbody>";
+  $('matrix').innerHTML=html;
+}
+calc();
+</script>
+</body>
+</html>
