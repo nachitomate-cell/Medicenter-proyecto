@@ -112,6 +112,24 @@ function formatDuration(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+/**
+ * Estima cuánto tarda la transcripción (en ms) para mostrar el stepper.
+ * Whisper transcribe a varias veces la velocidad real; usamos ~20% de la
+ * duración del audio, acotado entre 4 y 25 s. Si no conocemos la duración,
+ * caemos a un valor conservador. Es solo una estimación visual: la fase real
+ * termina cuando responde el servidor.
+ */
+function estimateTranscriptionMs(audioDurationSeconds: number | null): number {
+  const FALLBACK_MS = 8000;
+  const MIN_MS = 4000;
+  const MAX_MS = 25000;
+  if (!audioDurationSeconds || !isFinite(audioDurationSeconds)) {
+    return FALLBACK_MS;
+  }
+  const estimate = audioDurationSeconds * 0.2 * 1000;
+  return Math.min(MAX_MS, Math.max(MIN_MS, estimate));
+}
+
 function validateAudioFile(file: File): string | null {
   const extension = file.name.toLowerCase().split(".").pop() ?? "";
   const validExtensions = ["mp3", "wav", "m4a", "webm", "ogg"];
@@ -346,9 +364,19 @@ export default function UploadPage() {
         setUploadProgress(pct)
       );
 
-      // Transición de fase: el servidor va a transcribir y auditar.
+      // Transición de fase: el servidor transcribe y luego audita en una sola
+      // request síncrona, así que el cliente no recibe la marca exacta de fin de
+      // transcripción. Estimamos su duración a partir del largo del audio (la
+      // transcripción crece con la duración del dictado) en lugar de un valor
+      // fijo, para que el stepper no "mienta" en audios largos.
+      // TODO: reemplazar por progreso real (SSE/streaming) cuando el pipeline
+      // pase a asíncrono — ver docs/02-decisiones-tecnicas.md (Decisión 6).
       setProcessingPhase("transcribing");
-      phaseTimer = setTimeout(() => setProcessingPhase("auditing"), 8000);
+      const transcriptionEstimateMs = estimateTranscriptionMs(audioDuration);
+      phaseTimer = setTimeout(
+        () => setProcessingPhase("auditing"),
+        transcriptionEstimateMs
+      );
 
       // Paso 3: disparar la auditoría con JSON.
       const auditRes = await fetch("/api/audit", {

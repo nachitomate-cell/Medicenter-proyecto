@@ -32,9 +32,15 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.local.example
 
 # firebase credentials
 service-account.json
+
+# legacy local-storage artifacts (superseded by Firestore/Storage)
+/data/cases/
+/data/temp/
+/public/audios/
 
 # vercel
 .vercel
