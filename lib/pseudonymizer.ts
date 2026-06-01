@@ -23,11 +23,33 @@ export interface PseudonymizedResult {
   tokenCount: number;
 }
 
+export interface PseudonymizeOptions {
+  /**
+   * Si true, tokeniza un nombre propio (2–4 palabras en Título) al INICIO del
+   * texto. Pensado para transcripciones de dictado, que suelen abrir con el
+   * nombre del paciente sin etiqueta previa ("Iván Sandoval Chávez tiene...").
+   * NO usar en informes: suelen abrir con un título ("Informe Ecográfico").
+   */
+  leadingName?: boolean;
+}
+
+// Palabras frecuentes al inicio de un texto clínico que NO son nombres de
+// paciente; evitan falsos positivos de la heurística de nombre inicial.
+const LEADING_NON_NAME = new Set([
+  "informe", "ecografia", "ecografía", "examen", "estudio", "control", "eco",
+  "doppler", "resonancia", "tomografia", "tomografía", "radiografia",
+  "radiografía", "paciente", "identificacion", "identificación", "hallazgos",
+  "conclusion", "conclusión",
+]);
+
 /**
  * Seudonimiza un texto médico en español (Chile).
  * Los patrones se aplican en orden de mayor a menor riesgo de re-identificación.
  */
-export function pseudonymize(text: string): PseudonymizedResult {
+export function pseudonymize(
+  text: string,
+  opts: PseudonymizeOptions = {}
+): PseudonymizedResult {
   let result = text;
   const map: Record<string, string> = {};
   let counter = 0;
@@ -43,6 +65,22 @@ export function pseudonymize(text: string): PseudonymizedResult {
       map[token] = match;
       return token;
     });
+  }
+
+  // 0. Nombre dictado al inicio (solo transcripciones). Anclado al inicio para
+  //    no tocar términos clínicos del cuerpo del texto.
+  if (opts.leadingName) {
+    const m = result.match(
+      /^\s*([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){1,3})/
+    );
+    if (m) {
+      const firstWord = m[1].split(/\s+/)[0].toLowerCase();
+      if (!LEADING_NON_NAME.has(firstWord)) {
+        const token = makeToken("PACIENTE");
+        map[token] = m[1];
+        result = result.replaceAll(m[1], token);
+      }
+    }
   }
 
   // 1. RUT chileno: 12.345.678-9 · 12345678-9 · 1.234.567-K · 1234567-k

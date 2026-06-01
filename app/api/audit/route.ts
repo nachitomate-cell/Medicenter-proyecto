@@ -95,8 +95,16 @@ export async function POST(request: Request) {
       "chars"
     );
 
-    console.log("Paso 3: Seudonimizando textos...");
+    console.log("Paso 3: Seudonimizando textos (informe, transcripción y preinforme)...");
+    // Seudonimizamos TODO lo que se envía al LLM y lo que se persiste/muestra:
+    // informe, transcripción del audio (puede contener nombre/RUT dictados en
+    // voz alta) y preinformes. Así no sale PHI hacia proveedores externos ni
+    // queda PHI en reposo, y la comparación textual se ve consistente.
     const { text: safeReport, tokenCount: reportTokens } = pseudonymize(report);
+    // leadingName: el dictado suele abrir con el nombre del paciente sin etiqueta.
+    const { text: safeTranscription, tokenCount: transcriptionTokens } =
+      pseudonymize(transcriptionData.text, { leadingName: true });
+
     let safePreinforme: string | undefined;
     let preinformeTokens = 0;
     if (preinforme) {
@@ -104,10 +112,18 @@ export async function POST(request: Request) {
       safePreinforme = text;
       preinformeTokens = tokenCount;
     }
-    const pseudonymizedTokens = reportTokens + preinformeTokens;
+
+    let safePreinformeRadiologo: string | undefined;
+    if (preinformeRadiologo) {
+      safePreinformeRadiologo = pseudonymize(preinformeRadiologo).text;
+    }
+
+    const pseudonymizedTokens =
+      reportTokens + transcriptionTokens + preinformeTokens;
     if (pseudonymizedTokens > 0) {
       console.log(
-        `Seudonimización: ${pseudonymizedTokens} tokens PHI reemplazados.`
+        `Seudonimización: ${pseudonymizedTokens} tokens PHI reemplazados ` +
+          `(informe ${reportTokens}, audio ${transcriptionTokens}, preinforme ${preinformeTokens}).`
       );
     }
 
@@ -115,7 +131,7 @@ export async function POST(request: Request) {
       `Paso 4: Auditando con LLM (modo ${usedPreinforme ? "triple" : "dual"})...`
     );
     const auditResult = await runAudit(
-      transcriptionData.text,
+      safeTranscription,
       safeReport,
       safePreinforme
     );
@@ -125,9 +141,11 @@ export async function POST(request: Request) {
       "discrepancias"
     );
 
+    // Mapeamos contra el informe seudonimizado: es el texto que vio el LLM, así
+    // los rangos/citas (fragmento_informe) calzan con lo que se persiste y muestra.
     const discrepancies = mapLLMOutputToFrontend(
       auditResult,
-      report,
+      safeReport,
       transcriptionData.segments,
       transcriptionData.duration
     );
@@ -147,10 +165,10 @@ export async function POST(request: Request) {
 
     console.log("Paso 5: Guardando caso en Firestore...");
     const caseData: Omit<AuditCase, "id"> = {
-      report,
-      transcription: transcriptionData.text,
-      ...(preinforme && { preinforme }),
-      ...(preinformeRadiologo && { preinformeRadiologo }),
+      report: safeReport,
+      transcription: safeTranscription,
+      ...(safePreinforme && { preinforme: safePreinforme }),
+      ...(safePreinformeRadiologo && { preinformeRadiologo: safePreinformeRadiologo }),
       discrepancies,
       metadata,
       audioUrl: "",
