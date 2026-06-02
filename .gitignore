@@ -48,3 +48,13 @@ service-account.json
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# benchmark / test scripts output
+scripts/benchmark-output.txt
+scripts/test-timestamps.mjs
+
+# clinical data and unvalidated glossary candidates — never commit
+/reports-input/
+/audios-eval/
+scripts/glossary-candidates.txt
+scripts/eval-output.txt

@@ -96,7 +96,7 @@ export async function POST(request: Request) {
       "Paso 2: Transcribiendo con Groq Whisper...",
       `(${audioBuffer.length} bytes)`
     );
-    const transcriptionData = await transcribeAudio(audioFile);
+    const transcriptionData = await transcribeAudio(audioFile, examType);
     console.log(
       "Transcripción completada:",
       transcriptionData.text.length,
@@ -183,6 +183,9 @@ export async function POST(request: Request) {
     const caseData: Omit<AuditCase, "id"> = {
       report: safeReport,
       transcription: safeTranscription,
+      ...(transcriptionData.segments.length > 0 && {
+        transcriptionSegments: transcriptionData.segments,
+      }),
       ...(safePreinforme && { preinforme: safePreinforme }),
       ...(safePreinformeRadiologo && { preinformeRadiologo: safePreinformeRadiologo }),
       discrepancies,

@@ -40,6 +40,7 @@ export interface AuditCase {
   id: string;
   report: string;
   transcription: string;
+  transcriptionSegments?: WhisperSegment[];
   preinforme?: string;
   preinformeRadiologo?: string;
   discrepancies: Discrepancy[];

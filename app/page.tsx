@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect, DragEvent, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { FlowStepper } from "@/components/FlowStepper";
+import { DarkModeToggle } from "@/components/DarkModeToggle";
 
 // ============================================================
 // CONSTANTES
@@ -478,6 +479,19 @@ export default function UploadPage() {
             </span>
           </div>
           <div className="flex items-center gap-3 text-right">
+            <button
+              onClick={() => router.push("/audit")}
+              className="relative flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"
+              title="Historial de auditorías"
+              aria-label="Ver historial de auditorías"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                <path d="M3 3v5h5"/>
+                <polyline points="12 7 12 12 15 15"/>
+              </svg>
+            </button>
+            <DarkModeToggle />
             <div className="flex h-8 w-8 items-center justify-center rounded bg-[#0B3B5C]">
               <span className="text-[10px] font-bold text-white">MC</span>
             </div>

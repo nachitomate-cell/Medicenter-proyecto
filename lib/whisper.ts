@@ -12,7 +12,8 @@
 
 import Groq from "groq-sdk";
 import { getGeminiClient, GEMINI_TRANSCRIPTION_MODEL } from "./gemini";
-import type { WhisperVerboseResponse } from "./types";
+import type { WhisperSegment, WhisperVerboseResponse } from "./types";
+import { getGlossaryForExam } from "./glossary";
 
 const TRANSCRIPTION_PROVIDER = process.env.TRANSCRIPTION_PROVIDER ?? "groq";
 
@@ -44,12 +45,15 @@ function getClient(): Groq {
 
 /**
  * Punto de entrada: despacha al proveedor configurado.
+ * examType es opcional; cuando se provee y el proveedor es Gemini,
+ * se inyecta el glosario clínico en el prompt de transcripción.
  */
 export async function transcribeAudio(
-  audioFile: File
+  audioFile: File,
+  examType?: string
 ): Promise<WhisperVerboseResponse> {
   if (TRANSCRIPTION_PROVIDER === "gemini") {
-    return transcribeWithGemini(audioFile);
+    return transcribeWithGemini(audioFile, examType);
   }
   return transcribeWithGroq(audioFile);
 }
@@ -90,21 +94,42 @@ async function transcribeWithGroq(
   };
 }
 
-const TRANSCRIPTION_PROMPT =
+const TRANSCRIPTION_PROMPT_BASE =
   "Transcribe este audio de un dictado clínico en español (Chile), palabra " +
-  "por palabra y de forma literal. No resumas, no corrijas, no agregues " +
-  "comentarios ni encabezados: devuelve únicamente el texto transcrito.";
+  "por palabra y de forma literal. Devuelve ÚNICAMENTE un array JSON válido " +
+  "con objetos { \"start\": <segundos como número>, \"text\": <fragmento> }. " +
+  "Cada objeto debe cubrir entre 5 y 15 segundos de audio. El array debe " +
+  "cubrir todo el audio de principio a fin, en orden cronológico. " +
+  "No agregues explicaciones, markdown ni texto fuera del JSON.";
+
+function buildTranscriptionPrompt(examType?: string): string {
+  if (!examType) return TRANSCRIPTION_PROMPT_BASE;
+  const glossary = getGlossaryForExam(examType);
+  return (
+    TRANSCRIPTION_PROMPT_BASE +
+    "\n\nVocabulario clínico de referencia (úsalo para resolver términos " +
+    "ambiguos; no inventes palabras fuera de este dominio):\n" +
+    glossary
+  );
+}
+
+interface GeminiSegment {
+  start: number;
+  text: string;
+}
 
 /**
  * Transcribe con Gemini enviando el audio inline (base64).
  *
- * Formatos de audio soportados por Gemini: WAV, MP3, AIFF, AAC, OGG, FLAC.
- * (webm puede no estar soportado; para grabaciones del navegador preferir Groq.)
+ * Pide JSON con timestamps. Si el parse falla, hace fallback a texto plano
+ * sin segmentos para no romper el flujo.
  *
- * No devuelve segmentos con timestamps → `segments: []` y `duration: 0`.
+ * Formatos soportados por Gemini: WAV, MP3, AIFF, AAC, OGG, FLAC.
+ * (webm puede no estar soportado; para grabaciones del navegador preferir Groq.)
  */
 async function transcribeWithGemini(
-  audioFile: File
+  audioFile: File,
+  examType?: string
 ): Promise<WhisperVerboseResponse> {
   if (audioFile.size > GEMINI_MAX_INLINE_BYTES) {
     throw new Error(
@@ -122,19 +147,51 @@ async function transcribeWithGemini(
     `DEBUG - Iniciando transcripción con Gemini (${GEMINI_TRANSCRIPTION_MODEL}, ${mimeType})...`
   );
 
+  const prompt = buildTranscriptionPrompt(examType);
+  if (examType) {
+    console.log(`DEBUG - Glosario clínico inyectado para: "${examType}"`);
+  }
+
   const response = await ai.models.generateContent({
     model: GEMINI_TRANSCRIPTION_MODEL,
     contents: [
-      { text: TRANSCRIPTION_PROMPT },
+      { text: prompt },
       { inlineData: { mimeType, data: base64 } },
     ],
-    config: { temperature: 0 },
+    config: { temperature: 0, responseMimeType: "application/json" },
   });
 
-  const text = response.text?.trim();
-  if (!text) {
+  const raw = response.text?.trim();
+  if (!raw) {
     throw new Error("Gemini returned an empty transcription.");
   }
 
+  // Intentar parsear JSON con timestamps; fallback a texto plano si falla.
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      Array.isArray(parsed) &&
+      parsed.length > 0 &&
+      typeof (parsed[0] as GeminiSegment).start === "number" &&
+      typeof (parsed[0] as GeminiSegment).text === "string"
+    ) {
+      const geminiSegs = parsed as GeminiSegment[];
+      const segments: WhisperSegment[] = geminiSegs.map((seg, i) => {
+        const next = geminiSegs[i + 1];
+        const end = next ? next.start : seg.start + 2;
+        return { id: i, seek: 0, start: seg.start, end, text: seg.text };
+      });
+      const text = segments.map((s) => s.text).join(" ").trim();
+      const duration = segments[segments.length - 1].end;
+      console.log(`DEBUG - Gemini devolvió ${segments.length} segmentos con timestamps.`);
+      return { text, segments, language: "es", duration };
+    }
+  } catch {
+    // JSON inválido — caemos al fallback
+  }
+
+  // Fallback: texto plano sin timestamps
+  console.warn("DEBUG - Gemini no devolvió JSON válido; usando texto plano sin timestamps.");
+  const text = raw;
   return { text, segments: [], language: "es", duration: 0 };
 }

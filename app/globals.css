@@ -1,5 +1,46 @@
 @import "tailwindcss";
 
+/* class-based dark mode — toggle `dark` class on <html> */
+@variant dark (&:where(.dark, .dark *));
+
 body {
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ── Dark mode overrides ─────────────────────────────────── */
+.dark {
+  color-scheme: dark;
+}
+
+/* Backgrounds */
+.dark .bg-slate-50  { background-color: #0f172a; }
+.dark .bg-white     { background-color: #1e293b; }
+.dark .bg-slate-100 { background-color: #1e293b; }
+.dark .bg-slate-200 { background-color: #334155; }
+
+/* Text */
+.dark .text-slate-900 { color: #f1f5f9; }
+.dark .text-slate-800 { color: #e2e8f0; }
+.dark .text-slate-700 { color: #cbd5e1; }
+.dark .text-slate-600 { color: #94a3b8; }
+.dark .text-slate-500 { color: #64748b; }
+.dark .text-slate-400 { color: #64748b; }
+
+/* Borders */
+.dark .border-slate-100 { border-color: #1e293b; }
+.dark .border-slate-200 { border-color: #334155; }
+.dark .border-slate-300 { border-color: #475569; }
+
+/* Form controls */
+.dark input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+.dark textarea,
+.dark select {
+  background-color: #1e293b;
+  color: #e2e8f0;
+  border-color: #475569;
+}
+
+/* Placeholder text in dark mode */
+.dark ::placeholder {
+  color: #64748b;
 }
